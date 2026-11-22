@@ -46,6 +46,13 @@ function savePrefs() {
 
 let NOW = null, STATIONS = [], BYID = new Map(), HYDRO = null, OBS10 = null, CAMS = null, RINGS = null, PROV = null;
 let HIST = { months: new Map(), result: null };
+let OBS10_TS = 0, OBS10_P = null;
+async function ensureObs10() {
+  if (OBS10 && Date.now() - OBS10_TS < 9 * 60e3) return OBS10;
+  OBS10_P ||= getJSON(DATA_URL + "obs10.json" + bust()).then(d => { OBS10 = d; OBS10_TS = Date.now(); return d; })
+    .catch(e => { console.warn(e); return OBS10; }).finally(() => { OBS10_P = null; });
+  return OBS10_P;
+}
 
 /* ---------------------------------------------------------- tema */
 function isDark() {
@@ -65,7 +72,7 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", onTheme);
 function onTheme() { setBase(S.base); if (S.side === "station" && S.sel) openStation(S.sel, false); }
 
 /* ---------------------------------------------------------- mapa */
-const map = L.map("map", { zoomControl: false, minZoom: 6, maxZoom: 17, zoomSnap: 0.25, worldCopyJump: false })
+const map = L.map("map", { zoomControl: false, minZoom: 5, maxZoom: 17, zoomSnap: 0.25, worldCopyJump: false })
   .setView([41.45, -0.85], 8);
 L.control.zoom({ position: "bottomright" }).addTo(map);
 L.control.scale({ position: "bottomright", imperial: false }).addTo(map);
@@ -142,7 +149,7 @@ async function loadNow(first) {
     toast("No se han podido cargar los datos. Se reintentará en unos minutos.");
   }
   try { HYDRO = await getJSON(DATA_URL + "hydro.json" + bust()); } catch (e) { console.warn(e); }
-  try { OBS10 = await getJSON(DATA_URL + "obs10.json" + bust()); } catch (e) { console.warn(e); }
+  OBS10_TS = 0;   // la serie de 24 h de AEMET (toda España, ~1 MB) se pide solo cuando hace falta
   render();
   if (S.side === "station" && S.sel) openStation(S.sel, false);
   if (S.side === "rank") openRanking();
@@ -542,7 +549,7 @@ function drawInterp() {
   interpLayer = null;
   const def = currentDef();
   if (!S.layers.interp || def.hydro || !RINGS) return;
-  const pts = visibleStations().map(([s, v]) => ({ lat: s.lat, lon: s.lon, v }));
+  const pts = visibleStations().filter(([s]) => s.ar).map(([s, v]) => ({ lat: s.lat, lon: s.lon, v }));
   const kind = def.scale === "temp" ? "temp" : def.scale?.startsWith("prec") ? "prec" : def.scale === "wind" ? "wind" : def.scale === "hum" ? "hum" : "days";
   setTimeout(() => {
     const t0 = performance.now();
@@ -660,6 +667,10 @@ function stopTimebar() {
   $("#timebar").hidden = true;
 }
 
+map.on("moveend", () => {
+  if (S.anim === "obs10") showObs10Frame(TB.i);
+  if (S.side === "rank") openRanking();
+});
 $("#tb-range").addEventListener("input", e => { clearInterval(TB.timer); TB.timer = null; $("#tb-play").textContent = "▶"; showFrame(e.target.value); });
 $("#tb-play").addEventListener("click", () => {
   if (TB.timer) { clearInterval(TB.timer); TB.timer = null; $("#tb-play").textContent = "▶"; return; }
@@ -673,7 +684,10 @@ $("#tb-play").addEventListener("click", () => {
 });
 
 /* animación de las observaciones diezminutales de AEMET */
-function startObs10Anim() {
+async function startObs10Anim() {
+  $("#anim-btn").textContent = "Cargando…";
+  await ensureObs10();
+  $("#anim-btn").textContent = "▶ Animar las últimas 24 h de AEMET";
   if (!OBS10) return toast("Las observaciones de AEMET aún no están disponibles.");
   const t0 = Date.parse(OBS10.t0);
   TB.frames = Array.from({ length: OBS10.n }, (_, k) => ({ t: t0 + k * OBS10.step * 1000, k }));
@@ -704,8 +718,9 @@ function showObs10Frame(k) {
   $("#tb-label").textContent = new Date(f.t).toLocaleString("es-ES", { weekday: "short", hour: "2-digit", minute: "2-digit" });
   stationsLayer && map.removeLayer(stationsLayer);
   stationsLayer = L.layerGroup();
+  const view = map.getBounds().pad(0.15);
   for (const [id, d] of Object.entries(OBS10.data)) {
-    const m = OBS10.meta[id]; if (!m) continue;
+    const m = OBS10.meta[id]; if (!m || !view.contains([m[1], m[2]])) continue;
     const v = obs10Value(d, S.v, k);
     if (v == null || !passFilter(v)) continue;
     const c = colorFor(def.scale, v);
@@ -788,7 +803,10 @@ function openStation(id, fly = true) {
   $("#btn-share").addEventListener("click", () => {
     navigator.clipboard?.writeText(location.href).then(() => toast("Enlace copiado."));
   });
-  if (o10) plotObs10(id, o10); else plotDaily(id);
+  if (st.src === "AEMET") {
+    $("#chart-title").textContent = "Cargando las últimas 24 horas…";
+    ensureObs10().then(o => { if (S.sel !== id) return; const d = o?.data?.[id]; d ? plotObs10(id, d) : plotDaily(id); });
+  } else plotDaily(id);
 }
 
 /* ---------- gráficos (Plotly bajo demanda) */
@@ -922,7 +940,10 @@ function openRanking() {
   let items;
   if (def.hydro === "gauges" && HYDRO) items = HYDRO.meta.gauges.map(g => [g, HYDRO.gauges[g.id]?.q]).filter(x => x[1] != null).map(([g, v]) => ({ id: g.id, name: g.name, v, kind: "gauges" }));
   else if (def.hydro === "reservoirs" && HYDRO) items = HYDRO.meta.reservoirs.map(r => [r, HYDRO.reservoirs[r.id]?.pct]).filter(x => x[1] != null).map(([r, v]) => ({ id: r.id, name: r.name, v, kind: "reservoirs" }));
-  else items = visibleStations().map(([s, v]) => ({ id: s.id, name: s.name, v, src: s.src, alt: s.alt }));
+  else {
+    const view = map.getBounds();
+    items = visibleStations().filter(([s]) => view.contains([s.lat, s.lon])).map(([s, v]) => ({ id: s.id, name: s.name, v, src: s.src, alt: s.alt }));
+  }
   items.sort((a, b) => b.v - a.v);
   const row = (it, i) => `<tr data-id="${esc(it.id)}" data-kind="${it.kind || ""}"><td class="muted num">${i + 1}</td>
     <td><span class="r-name">${esc(it.name)}</span>${it.src ? `<span class="r-meta">${SOURCES[it.src]?.name || it.src}${it.alt != null ? ` · ${it.alt} m` : ""}</span>` : ""}</td>
@@ -930,7 +951,7 @@ function openRanking() {
   const top = items.slice(0, 15), low = items.slice(-15).reverse();
   const title = S.mode === "hist" && HIST.range ? `${def.label} · ${ddmm(HIST.range[0])} – ${ddmm(HIST.range[1])}` : def.label;
   openSide("rank", `<div class="eyebrow">Clasificación</div><h2 class="st-name">${esc(title)}</h2>
-    <p class="st-status">${items.length} estaciones con los filtros actuales</p>
+    <p class="st-status">${items.length} estaciones en la zona visible del mapa con los filtros actuales</p>
     <h3 class="block-title">Valores más altos</h3><table class="rank-table">${top.map(row).join("")}</table>
     ${items.length > 15 ? `<h3 class="block-title">Valores más bajos</h3><table class="rank-table">${low.map(row).join("")}</table>` : ""}`);
   $$("#side-body tr[data-id]").forEach(tr => tr.addEventListener("click", () => {

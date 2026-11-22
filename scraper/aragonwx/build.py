@@ -22,8 +22,8 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from .common import (CURRENT_MAX_AGE, OFFLINE_AFTER, ROOT, TZ, dump_json, iso, load_json, load_stations,
-                     log, read_csv)
+from .common import (CURRENT_MAX_AGE, OFFLINE_AFTER, ROOT, TZ, dump_json, in_aragon, iso, load_json,
+                     load_stations, log, read_csv)
 from .sources import aemet, dgt, pws, saih, wu
 
 FETCHERS = {
@@ -37,7 +37,7 @@ FETCHERS = {
     "AVAMET": pws.avamet,
 }
 
-COLS = ["id", "src", "name", "prov", "lat", "lon", "alt", "link", "q", "tzs", "model", "notes",
+COLS = ["id", "src", "name", "prov", "lat", "lon", "alt", "link", "q", "tzs", "model", "notes", "ar",
         "st", "t", "ta", "tx", "tn", "pr", "p1", "p24", "gust", "wg", "ws", "hr", "pres"]
 QMAP = {"Contrastada": "C", "Deficiente": "D"}
 PROV = {"Huesca": "H", "Zaragoza": "Z", "Teruel": "T"}
@@ -47,6 +47,16 @@ LIMITS = {"ta": (-35, 50), "tx": (-35, 50), "tn": (-35, 50), "pr": (0, 600), "p1
 
 # AEMET publica con retraso: su dato horario puede tener ~80 min y sigue siendo el último
 CURRENT_AGE_BY_SOURCE = {"AEMET": 5400}
+
+AEMET_LINK = "https://www.aemet.es/es/eltiempo/observacion/ultimosdatos?k=&l={}&w=1&datos=img"
+SMALL = {"de", "del", "la", "las", "el", "los", "y", "en"}
+
+
+def nice_name(s):
+    """'ZARAGOZA  AEROPUERTO' -> 'Zaragoza Aeropuerto'."""
+    words = " ".join(str(s).split()).lower().split(" ")
+    return " ".join(w if (i and w in SMALL) else w[:1].upper() + w[1:] for i, w in enumerate(words))
+
 
 HYDRO_EVERY = 1800
 HYDRO_KEEP = 72 * 3600
@@ -239,17 +249,18 @@ def main():
     # ---- estaciones
     rows, stats = [], {}
     extra = ctx.get("aemet_extra") or {}
-    for sid, m in extra.items():   # automáticas de AEMET nuevas que no están en el CSV
-        stations.append({"id": sid, "source": "AEMET", "name": m[0].title(), "prov": "", "lat": m[1],
-                         "lon": m[2], "alt": m[3], "link": "", "model": "", "notes": "auto",
+    for sid, m in extra.items():   # AEMET del resto de España (y altas nuevas en Aragón)
+        stations.append({"id": sid, "source": "AEMET", "name": nice_name(m[0]), "prov": "", "lat": m[1],
+                         "lon": m[2], "alt": m[3], "link": AEMET_LINK.format(sid), "model": "", "notes": "",
                          "q_tmax": "", "q_tmin": "", "q_prec": "", "q_wind": "", "tz_shift": False,
-                         "kind": "", "active": True})
+                         "kind": "", "active": True, "extra": True})
     for st in stations:
         src = st["source"]
         q = "".join(QMAP.get(st.get(k, ""), "-") for k in ("q_tmax", "q_tmin", "q_prec", "q_wind"))
         base = [st["id"], src, st["name"], PROV.get(st["prov"], ""), round(st["lat"], 5), round(st["lon"], 5),
                 st["alt"], st["link"] or None, q, 1 if st["tz_shift"] else 0, st.get("model") or None,
-                st.get("notes") or None]
+                st.get("notes") or None,
+                1 if not st.get("extra") or in_aragon(st["lat"], st["lon"], margin=0.3) else 0]
         if not st["active"] or (only and src not in only):
             o = {"st": "na"}
         elif src in results:
@@ -263,7 +274,7 @@ def main():
             daily = {k: o[k] for k in ("tx", "tn", "pr", "gust") if o.get(k) is not None}
             if daily:
                 snap[st["id"]] = daily
-        rows.append(base + [o.get("st"), o.get("t")] + [o.get(k) for k in COLS[14:]])
+        rows.append(base + [o.get("st"), o.get("t")] + [o.get(k) for k in COLS[15:]])
     # limpia estados de estaciones que ya no existen
     ids = {st["id"] for st in stations}
     for key in ("ext", "pinc", "pacc"):

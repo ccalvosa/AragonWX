@@ -1,6 +1,7 @@
 # Estaciones de Aragón
 
-Mapa en directo de las estaciones meteorológicas de Aragón: AEMET (cada 10 minutos),
+Mapa en directo de las estaciones meteorológicas de Aragón y de toda la red automática de
+AEMET en España (cada 10 minutos),
 SAIH Ebro, Weather Underground, WeatherCloud, Meteoclimatic, Ibericam, Holfuy y AVAMET,
 más ríos, embalses, radar, satélite, rayos y webcams.
 
@@ -16,7 +17,8 @@ descarga los datos cada 10 minutos y los publica en la rama `data`.
   acumulada, días de lluvia, helada o calor, racha máxima) a partir del cierre diario.
 - **Ficha de estación**: valores del día, calidad del dato, gráfica de las últimas 24 h
   cada 10 minutos (AEMET), de 72 h (ríos y embalses) o de los últimos días (resto).
-- **Animación** de las últimas 24 h de AEMET cada 10 minutos.
+- **Animación** de las últimas 24 h de AEMET cada 10 minutos (estaciones de la zona visible).
+- **Ranking** de las estaciones de la zona visible del mapa (Aragón, una comarca o toda España).
 - **Capas**: interpolación por krigeado recortada a Aragón, radar (RainViewer),
   satélite MTG (infrarrojo, visible, GeoColor) y rayos MTG-LI de EUMETSAT, webcams
   (propias y de la DGT), red manual de AEMET y límites provinciales.
@@ -34,7 +36,7 @@ index.html + js/ ◄── lee los JSON de raw.githubusercontent.com
 
 | Fuente | Cómo se descarga |
 |---|---|
-| AEMET | OpenData `diezminutal/todas` + `todas` (24 h cada 10 min, como en aemet-explorer) y paquete *udat* de aemet.es (máx/mín/racha/lluvia oficiales del día) |
+| AEMET | Solo la API OpenData, todas las estaciones de España: `diezminutal/todas` + `todas` (serie de 24 h cada 10 min, como en aemet-explorer). Máxima, mínima, racha y lluvia del día salen de esa serie |
 | SAIH Ebro | API JSON de mapas (temperaturas, meteorología, embalses, aforos) y tabla de pluviometrías |
 | Weather Underground | API de weather.com (actual en cada pasada, resumen diario cada 30 min) |
 | WeatherCloud | `device/stats` (JSON) |
@@ -63,10 +65,11 @@ No se usa Selenium: una pasada completa tarda unos 20 segundos.
 ## Estructura
 
 - `index.html`, `css/style.css`, `js/app.js`, `js/scales.js` (escalas y variables),
-  `js/kriging.js` (krigeado ordinario): la web, con Leaflet (y Plotly bajo demanda).
+  `js/kriging.js` (krigeado ordinario, solo con Aragón y su entorno): la web, con Leaflet (y Plotly bajo demanda).
 - `config/stations.csv`: la red. Columnas `id, source, name, prov, lat, lon, alt, link,
   model, notes, q_tmax, q_tmin, q_prec, q_wind, tz_shift, kind, active`. Para añadir una
-  estación basta con una fila nueva. En las del SAIH con temperatura, `notes` lleva
+  estación basta con una fila nueva. Las automáticas de AEMET del resto de España no
+  necesitan fila: entran solas desde la API. En las del SAIH con temperatura, `notes` lleva
   `tag=<señal>`.
 - `config/reservoirs.csv`, `config/gauges.csv` (umbrales de aviso), `config/webcams.csv`.
 - `scraper/aragonwx/`: `build.py` (orquestador) y `sources/` (una fuente por fichero).

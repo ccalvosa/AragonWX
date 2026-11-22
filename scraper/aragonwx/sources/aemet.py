@@ -1,28 +1,25 @@
 """
-AEMET: dos vías complementarias.
+AEMET: solo AEMET OpenData (requiere AEMET_API_KEY), para todas las estaciones
+automáticas de España.
 
-1) Diezminutales + horarios de AEMET OpenData (requiere AEMET_API_KEY), igual que
-   en aemet-explorer (scripts/update_obs.py): el endpoint diezminutal solo da la
-   última hora, así que se fusiona con la serie anterior para guardar 24 h.
-   Se queda con las estaciones dentro de Aragón y escribe obs10.json para las
-   gráficas y la animación de la web. De esa serie salen además los valores
-   actuales (temperatura, humedad, viento, presión) y extremos del día.
+  observacion/convencional/diezminutal/todas  datos cada 10 min (solo la última hora)
+  observacion/convencional/todas              datos horarios (~12 h) con máxima, mínima
+                                              y lluvia de cada hora
 
-2) Paquete «udat» de aemet.es (sin clave): máximas, mínimas, rachas y lluvia
-   diarias provisionales oficiales del día en curso (hora local).
-
-Los dos se combinan: máxima = la mayor de ambas, mínima = la menor, etc.
+Igual que en aemet-explorer (scripts/update_obs.py): como el diezminutal solo da
+la última hora, se fusiona con la serie anterior para guardar 24 h (obs10.json).
+De esa serie salen los valores actuales y los del día local en curso: máxima y
+mínima (extremos horarios + diezminutales), racha máxima y lluvia desde
+medianoche, y la lluvia de la última hora y de las últimas 24 h.
 """
 
-import io
 import json
 import os
 import re
-import tarfile
 import time
 from datetime import datetime, timedelta, timezone
 
-from ..common import TZ, in_aragon, iso, log, num, session
+from ..common import TZ, iso, log, num, session
 
 API = "https://opendata.aemet.es/opendata/api/observacion/convencional/"
 URL_10 = API + "diezminutal/todas"
@@ -44,8 +41,6 @@ V10 = {
 }
 VH = {"tamax": "tamax", "tamin": "tamin", "prec": "prec"}
 
-UDAT_PAGE = "https://www.aemet.es/es/eltiempo/observacion/ultimosdatos?w=2&l=9434P"
-UDAT_DAILY = {"tmax": "tx", "tmin": "tn", "racha": "gust", "pre-0024": "pr"}
 
 
 # ------------------------------------------------------------------ OpenData
@@ -104,17 +99,12 @@ def update_obs10(prev, api_key):
         log("  AEMET OpenData no responde; se conserva la serie anterior")
         return prev
 
-    def keep(lat, lon):
-        return in_aragon(lat, lon, margin=0.08)
-
     for row in rows10 or []:
         sid, f = row.get("IDEMA"), row.get("Fecha")
         if not sid or not f:
             continue
         lon, lat = (row.get("LOC") or {}).get("coordinates", [None, None])
-        if sid not in meta:
-            if not keep(lat, lon):
-                continue
+        if sid not in meta and lat is not None:
             meta[sid] = [(row.get("UBI") or sid).strip(), round(lat, 4), round(lon, 4),
                          int(round(float(row["ALT"]))) if row.get("ALT") is not None else None]
         t = _pt(f)
@@ -132,10 +122,8 @@ def update_obs10(prev, api_key):
         sid, f = row.get("idema"), row.get("fint")
         if not sid or not f:
             continue
-        if sid not in meta:
+        if sid not in meta and row.get("lat") is not None:
             lat, lon = num(row.get("lat"), 4), num(row.get("lon"), 4)
-            if not keep(lat, lon):
-                continue
             meta[sid] = [(row.get("ubi") or sid).strip(), lat, lon,
                          int(round(float(row["alt"]))) if row.get("alt") is not None else None]
         t = _pt(f)
@@ -242,81 +230,20 @@ def obs_from_obs10(o):
     return out
 
 
-# ------------------------------------------------------------------ udat (web)
-def fetch_udat():
-    """{IDEMA: {tx, tn, gust, pr, ta, t}} del día local en curso; {} si falla."""
-    s = session()
-    try:
-        page = s.get(UDAT_PAGE, timeout=30)
-        page.raise_for_status()
-        m = re.search(r'/es/geojson/download/udat/[^"\']+\.tar\.gz', page.text)
-        if not m:
-            raise RuntimeError("no aparece el enlace al paquete udat")
-        r = s.get("https://www.aemet.es" + m.group(0), timeout=90)
-        r.raise_for_status()
-        tar = tarfile.open(fileobj=io.BytesIO(r.content), mode="r:gz")
-    except Exception as e:
-        log(f"  udat: {e}")
-        return {}
-    today = datetime.now(TZ).strftime("%Y-%m-%d")
-    files = [m for m in tar.getmembers() if m.isfile() and "_PB_" in m.name]
-    out = {}
-    for folder, key in UDAT_DAILY.items():
-        cand = [m for m in files if m.name.startswith(f"diarios/{folder}/")]
-        if not cand:
-            continue
-        fc = json.load(tar.extractfile(max(cand, key=lambda m: m.name)))
-        for f in fc.get("features", []):
-            p = f.get("properties", {})
-            if str(p.get("FINIT", "")).startswith(today) and p.get(folder) is not None:
-                out.setdefault(p["IDEMA"], {})[key] = num(p[folder])
-    cand = [m for m in files if m.name.startswith("horarios/temp/")]
-    if cand:
-        fc = json.load(tar.extractfile(max(cand, key=lambda m: m.name)))
-        for f in fc.get("features", []):
-            p = f.get("properties", {})
-            if p.get("TA") is None or not p.get("FINT"):
-                continue
-            t = int(datetime.fromisoformat(p["FINT"]).replace(tzinfo=timezone.utc).timestamp())
-            o = out.setdefault(p["IDEMA"], {})
-            o["ta_h"], o["t_h"] = num(p["TA"]), t
-    return out
-
-
 def fetch(stations, ctx):
-    """Observaciones de las estaciones AEMET de la red + actualiza ctx['obs10']."""
-    ids = {s["id"] for s in stations}
+    """Observaciones de todas las estaciones AEMET + actualiza ctx['obs10']."""
     key = os.environ.get("AEMET_API_KEY")
-    derived = {}
-    if key:
-        new = update_obs10(ctx.get("obs10"), key)
-        if new:
-            ctx["obs10"] = new
-            derived = obs_from_obs10(new)
-    else:
-        log("  AEMET_API_KEY no definida: sin diezminutales")
-    udat = fetch_udat()
-    out = {}
-    for sid in ids | (set(derived) & set(udat)):
-        d, u = derived.get(sid, {}), udat.get(sid, {})
-        if not d and not u:
-            continue
-        r = dict(d)
-        for k, f in (("tx", max), ("tn", min), ("gust", max), ("pr", max)):
-            vals = [x for x in (d.get(k), u.get(k)) if x is not None]
-            if vals:
-                r[k] = f(vals)
-        if "ta" not in r and u.get("ta_h") is not None:
-            r["ta"], r["t"] = u["ta_h"], u["t_h"]
-        if sid in derived:
-            for k in ("p1", "p24"):
-                if k in d:
-                    r[k] = d[k]
-        if "t" not in r and u:
-            r["t"] = u.get("t_h") or int(time.time())
-        out[sid] = r
-    # estaciones automáticas de Aragón que aún no están en config/stations.csv
-    ctx["aemet_extra"] = {sid: ctx["obs10"]["meta"][sid] for sid in derived
-                          if sid not in ids and sid in (ctx.get("obs10") or {}).get("meta", {})}
-    log(f"  AEMET: {len(out)} estaciones con datos ({len(derived)} con diezminutales, {len(udat)} en udat)")
+    if not key:
+        log("  AEMET_API_KEY no definida: sin datos de AEMET")
+        return {}
+    new = update_obs10(ctx.get("obs10"), key)
+    if not new:
+        return {}
+    ctx["obs10"] = new
+    out = obs_from_obs10(new)
+    ids = {s["id"] for s in stations}
+    # estaciones que no están en config/stations.csv (resto de España y altas nuevas)
+    ctx["aemet_extra"] = {sid: new["meta"][sid] for sid in out if sid not in ids and sid in new["meta"]}
+    n10 = sum(1 for d in new["data"].values() if any(x is not None for x in (d.get("ta") or [])[-6:]))
+    log(f"  AEMET: {len(out)} estaciones con datos ({n10} con diezminutales en la última hora)")
     return out
