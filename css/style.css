@@ -550,3 +550,20 @@ body.page { overflow: auto; display: block; }
   .leaflet-bottom.leaflet-right { margin-bottom: 64px; }
   .tiles { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* página «Acerca de» */
+.about .card-block ul { margin: 0.4rem 0 0; padding-left: 1.1rem; display: grid; gap: 0.45rem; }
+.about .card-block p { line-height: 1.55; }
+.about .card-block li { line-height: 1.5; }
+.about-warn { background: var(--accent-soft); border-radius: var(--radius-sm); padding: 0.6rem 0.8rem; margin-top: 0.8rem; }
+.about-toc { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 1rem 0; }
+.about-toc a { border: 1px solid var(--border); background: var(--card); border-radius: 99px; padding: 0.3rem 0.75rem; font-size: 0.8rem; font-weight: 600; color: var(--fg); text-decoration: none; }
+.about-toc a:hover { border-color: var(--accent); }
+.about-table td { vertical-align: top; font-size: 0.82rem; }
+.about-table td:first-child { white-space: nowrap; font-weight: 600; }
+@media (max-width: 700px) {
+  .about-table thead { display: none; }
+  .about-table tr { display: block; padding: 0.55rem 0; border-bottom: 1px solid var(--border); }
+  .about-table td { display: block; border: 0 !important; padding: 0.1rem 0 !important; white-space: normal !important; }
+  .about-table td:last-child { color: var(--muted); }
+}

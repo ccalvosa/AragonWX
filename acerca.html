@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Acerca de la web</title>
+<meta name="description" content="Cómo funciona Estaciones de Aragón: de dónde salen los datos, cómo se tratan, sus límites y los créditos de cada fuente.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3CclipPath id='c'%3E%3Crect width='32' height='32' rx='8'/%3E%3C/clipPath%3E%3Cg clip-path='url(%23c)'%3E%3Crect width='7' height='32' fill='%231c7ed6'/%3E%3Crect x='6.4' width='7' height='32' fill='%2374c0fc'/%3E%3Crect x='12.8' width='7' height='32' fill='%23ffd8a8'/%3E%3Crect x='19.2' width='7' height='32' fill='%23ff8787'/%3E%3Crect x='25.6' width='7' height='32' fill='%23e03131'/%3E%3C/g%3E%3C/svg%3E">
+<script>try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css?v=18">
+</head>
+<body class="page">
+<header class="topbar">
+  <a class="brand" href="./" title="Volver al mapa">
+    <svg class="brand-logo" viewBox="0 0 32 32" aria-hidden="true"><clipPath id="lc"><rect width="32" height="32" rx="8"/></clipPath>
+      <g clip-path="url(#lc)"><rect width="7" height="32" fill="#1c7ed6"/><rect x="6.4" width="7" height="32" fill="#74c0fc"/><rect x="12.8" width="7" height="32" fill="#ffd8a8"/><rect x="19.2" width="7" height="32" fill="#ff8787"/><rect x="25.6" width="7" height="32" fill="#e03131"/></g></svg>
+    <span class="brand-text">Estaciones de Aragón</span><small>ACERCA DE</small>
+  </a>
+  <div class="top-actions"><a class="btn ghost" href="estado.html">Estado</a><a class="btn ghost" href="./">← Volver al mapa</a></div>
+</header>
+
+<main class="status-page about">
+  <section class="st-hero">
+    <h1>Cómo funciona esta web</h1>
+    <p class="muted">Un mapa en directo de las estaciones meteorológicas de Aragón y su entorno, oficiales y de aficionados,
+      con radar, satélite, previsión y avisos. Es un proyecto personal sin ánimo de lucro: el código y los datos procesados son
+      públicos en <a href="https://github.com/ccalvosa/AragonWX" target="_blank" rel="noopener">GitHub</a>.</p>
+    <p class="about-warn"><b>Importante:</b> los datos se muestran tal como llegan, en tiempo real y sin validar. No son datos
+      oficiales ni sustituyen a los avisos de <a href="https://www.aemet.es" target="_blank" rel="noopener">AEMET</a> ni a los de Protección Civil.</p>
+  </section>
+
+  <nav class="about-toc">
+    <a href="#datos">Los datos</a><a href="#calidad">Control de calidad</a><a href="#mapas">Mapas e interpolación</a>
+    <a href="#radar">Radar</a><a href="#prevision">Previsión</a><a href="#historico">Histórico y récords</a><a href="#creditos">Fuentes y créditos</a>
+  </nav>
+
+  <section class="card-block" id="datos">
+    <h2>Los datos</h2>
+    <p>Un proceso automático en GitHub Actions descarga cada 10 minutos todas las redes, las junta en un único fichero y lo publica.
+      La web lo lee directamente; no hay servidor propio. Cada estación muestra la temperatura actual, la máxima y la mínima del día,
+      la lluvia de hoy, de la última hora y de las últimas 24 horas, la racha máxima, el viento y la humedad, según lo que dé cada red.</p>
+    <ul>
+      <li><b>Día meteorológico:</b> de medianoche a medianoche en hora peninsular. Las estaciones que acumulan la lluvia con otro
+        horario se corrigen (columna <code>tz_shift</code> de la lista de estaciones).</li>
+      <li><b>Antigüedad:</b> la temperatura «actual» solo se muestra si tiene menos de una hora (hora y media en AEMET, que
+        publica con retraso). La máxima, la mínima y la lluvia del día se mantienen hasta el cierre del día.</li>
+      <li><b>Calidad manual:</b> cada variable de cada estación puede marcarse como <i>contrastada</i> o <i>dudosa</i>. Las dudosas
+        se ocultan salvo que se active «Mostrar datos de calidad dudosa».</li>
+      <li><b>Solapes:</b> en el mapa, las etiquetas a menos de 20 píxeles se agrupan y muestran la mediana, hasta el zoom 15.
+        AEMET y SAIH quedan siempre por encima.</li>
+      <li><b>Lista de estaciones:</b> se mantiene a mano desde el editor de la web. Una búsqueda diaria propone estaciones nuevas
+        en Aragón de Weather Underground, Meteoclimatic y Holfuy.</li>
+    </ul>
+  </section>
+
+  <section class="card-block" id="calidad">
+    <h2>Control de calidad automático</h2>
+    <p>Cada pasada compara cada estación con sus vecinas y con su propio historial, y marca lo sospechoso. No corrige ni borra
+      ningún dato: lo señala en la ficha y lo propone en el editor para revisarlo.</p>
+    <ul>
+      <li><b>Temperatura:</b> diferencias fuertes con la mediana de las vecinas (hasta 12, a menos de 20 km y con menos de 300 m de desnivel).
+        No se corrige por altitud: solo se avisa.</li>
+      <li><b>Temperatura congelada:</b> el mismo valor durante 6 horas o más mientras las vecinas cambian.</li>
+      <li><b>Lluvia:</b> lluvia aislada que no ve ninguna vecina, pluviómetros que nunca marcan nada cuando las vecinas sí, y
+        acumulados imposibles.</li>
+      <li><b>Viento y humedad:</b> rachas muy por encima de las vecinas y humedades imposibles (3 % o menos).</li>
+      <li>Para no avisar por casos puntuales, una sospecha solo se propone si se repite durante una hora hoy o en dos días de
+        la última semana.</li>
+    </ul>
+  </section>
+
+  <section class="card-block" id="mapas">
+    <h2>Mapas e interpolación</h2>
+    <ul>
+      <li><b>Krigeado:</b> interpolación por krigeado ordinario (variograma exponencial) de las estaciones de Aragón, recortada a la
+        comunidad. Antes se agrupan las estaciones en celdas de unos 8 km (mediana), para que las ciudades no dominen, y se quitan
+        las que se separan mucho de sus vecinas. Se recalcula a la resolución de la pantalla en cada zoom.</li>
+      <li><b>Temperatura con altitud:</b> en temperatura se ajusta cada vez una recta de temperatura frente a altitud con las
+        estaciones (o dos tramos, si mejora claramente, para recoger inversiones), se krigea lo que la recta no explica y en cada
+        punto se suma la recta con la altitud del modelo digital del terreno (unos 250 m). La leyenda muestra el gradiente ajustado.
+        Por encima de la estación más alta es una extrapolación.</li>
+      <li><b>Anomalías:</b> la máxima y la mínima de hoy de AEMET frente a su normal para este día. La normal es una curva suave
+        del ciclo anual (media y tres armónicos) ajustada a 1991–2020 cuando la estación tiene al menos 20 años en ese periodo, y si
+        no, a todos sus años (mínimo 10). Las normales de periodos recientes son algo más cálidas, así que sus anomalías salen algo
+        más bajas. A primera hora, la máxima del día aún no ha llegado y su anomalía no es representativa.</li>
+      <li><b>Avisos:</b> los avisos meteorológicos en vigor de AEMET (formato CAP), dibujados sobre sus zonas.</li>
+    </ul>
+  </section>
+
+  <section class="card-block" id="radar">
+    <h2>Radar</h2>
+    <p>Radar de Zaragoza de AEMET (Perdiguera), recibido a través de la red europea EUMETNET OPERA. Se usa la elevación más baja (0,5°)
+      de cada exploración, en sus coordenadas originales: cada píxel de la pantalla toma el valor de la celda del radar que le
+      corresponde, sin suavizar.</p>
+    <ul>
+      <li><b>Alta resolución:</b> exploración Doppler, celdas de 500 m hasta 150 km, cada 10 minutos.</li>
+      <li><b>Baja resolución:</b> exploración de largo alcance, celdas de 1 km hasta 250 km, cada 10 minutos.</li>
+      <li><b>Velocidad radial:</b> de la exploración Doppler; positiva si la precipitación se aleja del radar. No se corrige el
+        plegado de velocidades: por encima de unos ±40 m/s el signo se invierte.</li>
+      <li><b>Lluvia estimada (1 h y 24 h):</b> la reflectividad de largo alcance se convierte en intensidad con la relación de
+        Marshall-Palmer (Z = 200·R<sup>1,6</sup>, de 7 a 55 dBZ para que el granizo no la dispare) y se suma cada 10 minutos.
+        Las celdas con ecos fijos del terreno (con eco más de la mitad del tiempo en los últimos días) no suman. El acumulado se
+        corrige con un único factor frente a la lluvia de 24 h de los pluviómetros de AEMET. Es una estimación: el radar ve la
+        lluvia en altura, las montañas tapan parte del haz y lejos del radar suele quedarse corto.</li>
+      <li>Las imágenes llegan unos 6 minutos después de su hora. Se guardan las 3 últimas horas.</li>
+    </ul>
+  </section>
+
+  <section class="card-block" id="prevision">
+    <h2>Previsión</h2>
+    <ul>
+      <li><b>Mapas de AROME:</b> modelo AROME de Météo-France a 0,01° (1,3 km), cada 3 horas, hasta 51 horas. Se muestra en su
+        rejilla original, sin interpolar: lluvia en 1 hora y acumulada, racha máxima y temperatura a 2 m.</li>
+      <li><b>Meteogramas:</b> para cada estación o cualquier punto del mapa, con <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a>:
+        AROME de alta resolución para los primeros días, el modelo determinista IFS de ECMWF hasta 10 días y su conjunto (ENS,
+        51 miembros) para ver la incertidumbre. En las estaciones se superponen las observaciones.</li>
+      <li><b>Error de la previsión:</b> en la pestaña de previsión de cada estación, el error de AROME e IFS frente a lo observado
+        en las últimas dos semanas (previsión del día anterior), para saber cuánto fiarse en ese punto.</li>
+    </ul>
+  </section>
+
+  <section class="card-block" id="historico">
+    <h2>Histórico y récords</h2>
+    <ul>
+      <li><b>Histórico:</b> cada noche se guarda el resumen del día de cada estación (máxima, mínima, lluvia y racha), desde 2024.
+        Para AEMET se usa la serie oficial completa del proyecto
+        <a href="https://ccalvosa.github.io/aemet-explorer/" target="_blank" rel="noopener">aemet-explorer</a>.</li>
+      <li><b>Récords:</b> absolutos, del mes y de este día del calendario. Los de AEMET salen de su serie oficial; los del resto,
+        de los datos guardados aquí, quitando antes los valores imposibles, los que no cuadran con las vecinas ese día y los de
+        variables marcadas como dudosas. Aun así, en las estaciones de aficionados alguno puede ser un error.</li>
+      <li><b>Resumen del día:</b> los diez valores más altos y más bajos de Aragón, ríos, embalses y avisos, con una imagen para
+        compartir. Excluye las estaciones dudosas, ocultas o con sospechas del control de calidad.</li>
+    </ul>
+  </section>
+
+  <section class="card-block" id="creditos">
+    <h2>Fuentes y créditos</h2>
+    <p class="muted small">Los datos pertenecen a sus autores. Esta web solo los recoge y los muestra, con enlace a cada fuente.</p>
+    <table class="net-table about-table">
+      <thead><tr><th>Fuente</th><th>Qué se usa</th><th>Condiciones</th></tr></thead>
+      <tbody>
+        <tr><td><a href="https://opendata.aemet.es" target="_blank" rel="noopener">AEMET OpenData</a></td><td>Observaciones cada 10 minutos y horarias de toda España, avisos (CAP), series diarias</td><td>Información elaborada por la Agencia Estatal de Meteorología (© AEMET). Reutilización citando la fuente.</td></tr>
+        <tr><td><a href="https://www.eumetnet.eu/observations/opera/" target="_blank" rel="noopener">EUMETNET OPERA</a></td><td>Radar de Zaragoza (AEMET)</td><td>CC BY 4.0</td></tr>
+        <tr><td><a href="https://www.saihebro.com" target="_blank" rel="noopener">SAIH Ebro</a> (Confederación Hidrográfica del Ebro)</td><td>Pluviómetros, temperatura, caudales de ríos y reserva de embalses</td><td>Datos en tiempo real, provisionales</td></tr>
+        <tr><td><a href="https://meteo.data.gouv.fr" target="_blank" rel="noopener">Météo-France</a></td><td>Modelo AROME 1,3 km</td><td>Licence Ouverte / Etalab 2.0</td></tr>
+        <tr><td><a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a></td><td>Meteogramas (AROME, ECMWF IFS y ENS) y altitud de los puntos</td><td>CC BY 4.0; datos de ECMWF (CC BY 4.0) y Météo-France</td></tr>
+        <tr><td><a href="https://view.eumetsat.int" target="_blank" rel="noopener">EUMETSAT</a></td><td>Imágenes de los satélites MTG y rayos (MTG-LI)</td><td>© EUMETSAT</td></tr>
+        <tr><td>Redes de aficionados</td><td><a href="https://www.wunderground.com" target="_blank" rel="noopener">Weather Underground</a>, <a href="https://app.weathercloud.net" target="_blank" rel="noopener">WeatherCloud</a>, <a href="https://www.meteoclimatic.net" target="_blank" rel="noopener">Meteoclimatic</a>, <a href="https://www.ibericam.com" target="_blank" rel="noopener">Ibericam</a>, <a href="https://holfuy.com" target="_blank" rel="noopener">Holfuy</a>, <a href="https://www.avamet.org" target="_blank" rel="noopener">AVAMET</a></td><td>Datos de sus propietarios, con enlace a cada estación</td></tr>
+        <tr><td><a href="https://www.dgt.es" target="_blank" rel="noopener">DGT</a></td><td>Cámaras de tráfico</td><td>Imágenes de la DGT</td></tr>
+        <tr><td>Mapas base</td><td>Esri (con datos de HERE, Garmin y OpenStreetMap)</td><td>Según la atribución del mapa</td></tr>
+        <tr><td>Modelo del terreno</td><td>AWS Terrain Tiles (EU-DEM de Copernicus y SRTM)</td><td>Producido con datos de Copernicus; SRTM de la NASA</td></tr>
+        <tr><td>Programas</td><td><a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>, Leaflet.markercluster, <a href="https://plotly.com/javascript/" target="_blank" rel="noopener">Plotly.js</a></td><td>BSD-2 y MIT</td></tr>
+      </tbody>
+    </table>
+    <p class="muted small">¿Falta tu estación o hay un error? Se puede proponer desde el editor de la web o en
+      <a href="https://github.com/ccalvosa/AragonWX/issues" target="_blank" rel="noopener">GitHub</a>.</p>
+  </section>
+</main>
+</body>
+</html>

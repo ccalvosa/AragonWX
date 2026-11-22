@@ -297,7 +297,7 @@ function renderStats() {
     <a href="https://github.com/${REPO}" target="_blank" rel="noopener">Código y datos</a> ·
     Radar <a href="https://www.eumetnet.eu/observations/opera/" target="_blank" rel="noopener">EUMETNET OPERA</a> (AEMET) ·
     Satélite <a href="https://view.eumetsat.int" target="_blank" rel="noopener">EUMETSAT</a><br>
-    <a href="estado.html">Estado del sistema</a> · <button class="link-btn small" id="btn-editor">Editar la red</button>`;
+    <a href="acerca.html">Acerca de</a> · <a href="estado.html">Estado del sistema</a> · <button class="link-btn small" id="btn-editor">Editar la red</button>`;
   $("#btn-editor").addEventListener("click", () => Editor.open());
 }
 
