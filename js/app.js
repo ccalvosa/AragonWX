@@ -26,11 +26,11 @@ const PREF_KEY = "aragonwx-prefs";
 const S = {
   mode: "now", v: "ta", hv: "x_max", filter: "all", official: false, doubtful: false, cluster: true,
   netsOff: new Set(), base: "auto", layers: { prov: true }, sat: "ir",
-  sel: null, side: null, anim: null,
+  sel: null, side: null, anim: null, ftab: "obs", wide: false,
 };
 try {
   const p = JSON.parse(localStorage.getItem(PREF_KEY) || "{}");
-  for (const k of ["v", "hv", "filter", "official", "doubtful", "cluster", "base", "sat"]) if (p[k] != null) S[k] = p[k];
+  for (const k of ["v", "hv", "filter", "official", "doubtful", "cluster", "base", "sat", "ftab", "wide"]) if (p[k] != null) S[k] = p[k];
   if (p.netsOff) S.netsOff = new Set(p.netsOff);
   if (p.layers) S.layers = { ...S.layers, ...p.layers, radar: false, sat: false, li: false, interp: false };
 } catch {}
@@ -39,7 +39,7 @@ function savePrefs() {
   try {
     localStorage.setItem(PREF_KEY, JSON.stringify({
       v: S.v, hv: S.hv, filter: S.filter, official: S.official, doubtful: S.doubtful, cluster: S.cluster,
-      netsOff: [...S.netsOff], base: S.base, layers: { prov: S.layers.prov, cams: S.layers.cams, manual: S.layers.manual }, sat: S.sat,
+      netsOff: [...S.netsOff], base: S.base, ftab: S.ftab, wide: S.wide, layers: { prov: S.layers.prov, cams: S.layers.cams, manual: S.layers.manual }, sat: S.sat,
     }));
   } catch {}
 }
@@ -735,6 +735,7 @@ function showObs10Frame(k) {
 /* ---------------------------------------------------------- panel lateral */
 function openSide(kind, html) {
   S.side = kind;
+  document.body.classList.toggle("side-wide", S.wide && (kind === "station" || kind === "point"));
   $("#side-body").innerHTML = html;
   $("#side").hidden = false;
   document.body.classList.add("side-open");
@@ -742,6 +743,7 @@ function openSide(kind, html) {
 }
 function closeSide() {
   S.side = null; S.sel = null;
+  document.body.classList.remove("side-wide");
   $("#side").hidden = true;
   document.body.classList.remove("side-open");
   $("#btn-rank").classList.remove("on");
@@ -794,7 +796,9 @@ function openStation(id, fly = true) {
     <div class="badges">${qbadge("Máx", 0)}${qbadge("Mín", 1)}${qbadge("Lluvia", 2)}${qbadge("Viento", 3)}
       ${st.tzs ? `<span class="badge warn" title="El contador de lluvia de esta estación se reinicia a otra hora; la lluvia de hoy se calcula sumando incrementos">Lluvia recalculada</span>` : ""}</div>
     ${st.notes && !/^tag=/.test(st.notes) ? `<p class="note">${esc(st.notes.replace(/\s*tag=\S+/, ""))}</p>` : ""}
-    <div class="chart-block" id="chart-block"><div class="chart-title" id="chart-title"></div><div class="plot" id="plot-a"></div><div class="plot plot-sm" id="plot-b"></div></div>
+    ${forecastTabsHTML(true)}
+    <div class="chart-block" id="tab-obs"><div class="chart-title" id="chart-title"></div><div class="plot" id="plot-a"></div><div class="plot plot-sm" id="plot-b"></div></div>
+    ${forecastBodyHTML(st.alt != null)}
     <div class="side-actions">
       ${st.link ? `<a class="btn" href="${esc(st.link)}" target="_blank" rel="noopener">Ver en ${esc(src.name)} ↗</a>` : ""}
       <button class="btn ghost" id="btn-share">Copiar enlace</button>
@@ -803,11 +807,134 @@ function openStation(id, fly = true) {
   $("#btn-share").addEventListener("click", () => {
     navigator.clipboard?.writeText(location.href).then(() => toast("Enlace copiado."));
   });
+  setupForecast({ lat: st.lat, lon: st.lon, alt: st.alt, id, st });
   if (st.src === "AEMET") {
     $("#chart-title").textContent = "Cargando las últimas 24 horas…";
     ensureObs10().then(o => { if (S.sel !== id) return; const d = o?.data?.[id]; d ? plotObs10(id, d) : plotDaily(id); });
   } else plotDaily(id);
 }
+
+/* ---------- previsión (Open-Meteo) */
+const FDAYS = [[3, "3 días"], [7, "7 días"], [15, "15 días"]];
+const FDEF = { det: 3, ens: 15 };
+let FC = null;   // {lat, lon, alt, id, st, det, ens, days}
+
+function forecastTabsHTML(withObs) {
+  return `<div class="tabs-row">
+    <div class="seg seg-sm" id="ftabs">${withObs ? `<button data-t="obs">Observado</button>` : ""}<button data-t="det">Previsión</button><button data-t="ens">Conjunto ENS</button></div>
+    <button class="icon-btn sm" id="btn-wide" title="Ampliar o reducir el panel" aria-label="Ampliar el panel"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M9.5 2H14v4.5M6.5 14H2V9.5M14 2L9 7M2 14l5-5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button></div>`;
+}
+
+function forecastBodyHTML(corrected) {
+  return `<div id="tab-fc" hidden>
+    <div class="fc-head"><div class="seg seg-sm" id="fdays"></div><span class="hint" id="fc-status"></span></div>
+    <div id="fc-plot" class="fc-plot"></div><div id="fc-table"></div>
+    <p class="credit">Previsión de <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0):
+      AROME France HD 1,3 km de Météo-France e IFS y ENS de ECMWF, interpolados al punto${corrected ? " y corregidos a la altitud de la estación" : ""}.
+      Arrastra para moverte en el tiempo y usa la rueda para acercar.</p></div>`;
+}
+
+function setupForecast(ctx) {
+  FC = { ...ctx, days: { ...FDEF } };
+  const tabs = $$("#ftabs button");
+  let tab = S.ftab;
+  if (!tabs.some(b => b.dataset.t === tab)) tab = "det";
+  tabs.forEach(b => b.addEventListener("click", () => { S.ftab = b.dataset.t; savePrefs(); showTab(b.dataset.t); }));
+  $("#btn-wide").addEventListener("click", () => {
+    S.wide = !S.wide; savePrefs();
+    document.body.classList.toggle("side-wide", S.wide);
+    setTimeout(() => $$("#side .js-plotly-plot").forEach(p => window.Plotly?.Plots.resize(p)), 240);
+  });
+  showTab(tab);
+}
+
+function showTab(t) {
+  $$("#ftabs button").forEach(b => b.classList.toggle("on", b.dataset.t === t));
+  const obs = $("#tab-obs");
+  if (obs) obs.hidden = t !== "obs";
+  $("#tab-fc").hidden = t === "obs";
+  if (t === "obs") {
+    setTimeout(() => ["plot-a", "plot-b"].forEach(i => { const p = document.getElementById(i); if (p?.data) window.Plotly?.Plots.resize(p); }), 30);
+    return;
+  }
+  $("#fdays").innerHTML = FDAYS.map(([d, l]) => `<button data-d="${d}" class="${FC.days[t] === d ? "on" : ""}">${l}</button>`).join("");
+  $$("#fdays button").forEach(b => b.addEventListener("click", () => {
+    FC.days[t] = +b.dataset.d;
+    $$("#fdays button").forEach(x => x.classList.toggle("on", x === b));
+    const el = $("#fc-plot"), nowMs = Date.now();
+    if (el.data) Plotly.relayout(el, { "xaxis.range": [Forecast.madrid(nowMs - (FC.days[t] <= 3 ? 12 : 18) * 3600e3), Forecast.madrid(nowMs + FC.days[t] * 86400e3)] });
+  }));
+  drawForecast(t);
+}
+
+async function drawForecast(t) {
+  const ctx = FC, el = $("#fc-plot");
+  $("#fc-status").textContent = t === "ens" ? "Cargando los 51 miembros del ENS…" : "Cargando AROME e IFS…";
+  $("#fc-table").innerHTML = "";
+  try {
+    await plotly();
+    const obsP = ctx.st?.src === "AEMET" ? ensureObs10() : Promise.resolve(null);
+    const detP = (ctx.det ||= Forecast.deterministic(ctx.lat, ctx.lon, ctx.alt));
+    const ensP = t === "ens" ? (ctx.ens ||= Forecast.ensemble(ctx.lat, ctx.lon, ctx.alt)) : null;
+    const [o10, det, ens] = await Promise.all([obsP, detP, ensP]);
+    if (FC !== ctx || !el.isConnected || $("#tab-fc").hidden) return;
+    const obs = Forecast.obsFrom(o10, ctx.id, ctx.st);
+    if (ctx.onElevation && det.elevation != null) ctx.onElevation(det.elevation);
+    if (t === "ens") Forecast.drawEnsemble(el, $("#fc-table"), ens, obs, ctx.days.ens, det.daily);
+    else Forecast.drawDeterministic(el, det, obs, ctx.days.det);
+    $("#fc-status").textContent = "";
+  } catch (e) {
+    console.warn(e);
+    if (FC === ctx) $("#fc-status").textContent = `No se ha podido cargar la previsión (${e.message || e}). Inténtalo de nuevo en un rato.`;
+  }
+}
+
+/* ---------- cualquier punto del mapa */
+function nearestStations(lat, lon, n = 4) {
+  const k = Math.cos(lat * Math.PI / 180);
+  return STATIONS.filter(s => s.st === "ok")
+    .map(s => [s, Math.hypot((s.lat - lat) * 111.2, (s.lon - lon) * 111.2 * k)])
+    .sort((a, b) => a[1] - b[1]).slice(0, n);
+}
+
+function openPoint(lat, lon) {
+  S.sel = null;
+  selMarker && map.removeLayer(selMarker);
+  selMarker = L.marker([lat, lon], { interactive: false, keyboard: false,
+    icon: L.divIcon({ className: "pin-icon", html: "<span></span>", iconSize: [22, 22], iconAnchor: [11, 21] }) }).addTo(map);
+  history.replaceState(null, "", `#${S.v}/@${lat.toFixed(4)},${lon.toFixed(4)}`);
+  const vkey = VARS[S.v] && !VARS[S.v].hydro ? S.v : "ta", def = VARS[vkey];
+  const near = nearestStations(lat, lon).map(([s, d]) => {
+    const v = s[vkey], c = v != null ? colorFor(def.scale, v) : "var(--card-2)";
+    return `<li data-id="${esc(s.id)}"><div><span class="r-name">${esc(s.name)}</span>
+      <span class="r-meta">${SOURCES[s.src]?.name || s.src} · ${fmt(d, d < 10 ? 1 : 0)} km${s.alt != null ? ` · ${s.alt} m` : ""}</span></div>
+      <span class="rv-pill" style="background:${c};color:${v != null ? inkFor(c) : "var(--muted)"}">${fmt(v, def.dec)}</span></li>`;
+  }).join("");
+  const deg = (v, p, n) => `${fmt(Math.abs(v), 3)}° ${v >= 0 ? p : n}`;
+  openSide("point", `
+    <div class="eyebrow"><span class="src-dot" style="--c:var(--accent)"></span>Punto del mapa</div>
+    <h2 class="st-name">${deg(lat, "N", "S")} · ${deg(lon, "E", "O")}</h2>
+    <div class="st-meta"><span class="tag" id="pt-elev">altitud…</span></div>
+    <h3 class="block-title">Estaciones más cercanas · ${esc(def.label.toLowerCase())}</h3>
+    <ul class="near-list">${near}</ul>
+    ${forecastTabsHTML(false)}
+    ${forecastBodyHTML(false)}
+    <div class="side-actions"><button class="btn ghost" id="btn-share">Copiar enlace</button></div>`);
+  $$(".near-list li").forEach(li => li.addEventListener("click", () => {
+    const s = BYID.get(li.dataset.id);
+    map.flyTo([s.lat, s.lon], Math.max(map.getZoom(), 11));
+    openStation(s.id, false);
+  }));
+  $("#btn-share").addEventListener("click", () => navigator.clipboard?.writeText(location.href).then(() => toast("Enlace copiado.")));
+  setupForecast({ lat, lon, alt: null, id: null, st: null,
+    onElevation: e => { const el = $("#pt-elev"); if (el) el.textContent = `${Math.round(e)} m`; } });
+}
+
+map.on("click", e => {
+  if (S.anim === "obs10") return;
+  openPoint(e.latlng.lat, e.latlng.lng);
+  if (innerWidth < 820) document.body.classList.remove("controls-open");
+});
 
 /* ---------- gráficos (Plotly bajo demanda) */
 let plotlyP = null;
@@ -815,7 +942,7 @@ function plotly() {
   if (window.Plotly) return Promise.resolve(window.Plotly);
   return (plotlyP ||= new Promise((res, rej) => {
     const sc = document.createElement("script");
-    sc.src = PLOTLY_SRC; sc.onload = () => res(window.Plotly); sc.onerror = rej;
+    sc.src = PLOTLY_SRC; sc.onload = () => { Forecast.registerLocale(); res(window.Plotly); }; sc.onerror = rej;
     document.head.appendChild(sc);
   }));
 }
@@ -1011,11 +1138,21 @@ function setupSearch() {
   buildControls();
   setupSearch();
   const h = decodeURIComponent(location.hash.slice(1));
-  if (h) { const [v, id] = h.split("/"); if (VARS[v]) S.v = v; if (id) S.sel = id; updateVarUI(); }
+  let startPoint = null;
+  if (h) {
+    const [v, id] = h.split("/");
+    if (VARS[v]) S.v = v;
+    if (id && id.startsWith("@")) {
+      const [la, lo] = id.slice(1).split(",").map(Number);
+      if (Number.isFinite(la) && Number.isFinite(lo)) startPoint = [la, lo];
+    } else if (id) S.sel = id;
+    updateVarUI();
+  }
   await loadStatic().catch(e => console.warn(e));
   await loadNow(true);
   $("#loading").classList.add("done");
   if (S.sel) openStation(S.sel);
+  else if (startPoint) { map.setView(startPoint, 10); openPoint(...startPoint); }
   for (const k of ["cams", "manual"]) if (S.layers[k]) toggleLayer(k);
   setInterval(() => { if (!document.hidden) loadNow(false); }, REFRESH_MS);
   document.addEventListener("visibilitychange", () => { if (!document.hidden && NOW && Date.now() / 1000 - NOW.ts > 11 * 60) loadNow(false); });

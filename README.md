@@ -17,6 +17,12 @@ descarga los datos cada 10 minutos y los publica en la rama `data`.
   acumulada, días de lluvia, helada o calor, racha máxima) a partir del cierre diario.
 - **Ficha de estación**: valores del día, calidad del dato, gráfica de las últimas 24 h
   cada 10 minutos (AEMET), de 72 h (ríos y embalses) o de los últimos días (resto).
+- **Meteogramas** en cada estación y en cualquier punto del mapa (clic donde no haya
+  estación). Los datos vienen de Open-Meteo y se piden desde el navegador:
+  - Previsión: AROME France HD 1,3 km e IFS (temperatura, punto de rocío, lluvia,
+    viento, racha, dirección y nubosidad), junto a lo observado por la estación.
+  - Conjunto ENS: penachos de 51 miembros con percentiles y tabla de probabilidades por
+    día (lluvia ≥ 1, 10 y 20 mm; helada; racha ≥ 70 km/h).
 - **Animación** de las últimas 24 h de AEMET cada 10 minutos (estaciones de la zona visible).
 - **Ranking** de las estaciones de la zona visible del mapa (Aragón, una comarca o toda España).
 - **Capas**: interpolación por krigeado recortada a Aragón, radar (RainViewer),
