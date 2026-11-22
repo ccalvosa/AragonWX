@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
-AROME France HD (Météo-France, 0,01° ≈ 1,3 km) recortado a Aragón para la web.
+AROME France HD (Météo-France, 0,01° ≈ 1,3 km) sobre la parte de España que cubre
+su dominio (hasta 37,5°N por el sur), con un margen amplio sobre Francia, el
+Atlántico y el Mediterráneo.
 
 Fuente: paquetes horarios abiertos de Météo-France (Licence Ouverte 2.0) en
 https://meteofrance-pnt.s3.rbx.io.cloud.ovh.net/pnt/<pasada>/arome/001/<SP1|SP2>/…
@@ -43,8 +45,9 @@ BUCKET = "https://meteofrance-pnt.s3.rbx.io.cloud.ovh.net"
 NHOURS = 52
 # rejilla de los ficheros 0,01°
 LAT0, LON0, STEP, NI, NJ = 55.4, -12.0, 0.01, 2801, 1791
-# recorte: Aragón y alrededores
-S, N, W, E = 39.3, 43.4, -2.8, 1.6
+# recorte: España dentro del dominio de AROME (el límite sur del modelo es 37,5°N),
+# de Galicia a Baleares y con margen sobre Francia
+S, N, W, E = 37.5, 45.0, -10.5, 5.0
 # (paquete, disciplina, categoría, número) -> nombre interno
 WANTED = {
     ("SP1", 0, 0, 0): "t2m",
@@ -60,6 +63,11 @@ ENC = {
     "gust": lambda g: g,
     "t2m": lambda t: (t + 40) * 2.5,
 }
+
+# identidad de lo publicado: pasada + recorte (si cambia el recorte, se rehace)
+def ident(run):
+    return f"{run}@{S},{W},{N},{E}"
+
 
 http = requests.Session()
 http.headers["User-Agent"] = "AragonWX (+https://github.com/ccalvosa/AragonWX)"
@@ -142,11 +150,22 @@ def crop_index():
     nrows = round((y1 - y0) / math.radians(STEP))
     ys = y1 - (np.arange(nrows) + 0.5) * (y1 - y0) / nrows
     tlat = np.degrees(2 * np.arctan(np.exp(ys)) - math.pi / 2)
-    rows = np.clip(np.round((LAT0 - tlat) / STEP).astype(int) - j0, 0, len(lats) - 1)
-    return slice(j0, j1 + 1), slice(i0, i1 + 1), rows
+    # posición fraccionaria de cada fila Mercator entre las filas de latitud (interpolación lineal)
+    f = np.clip((LAT0 - tlat) / STEP - j0, 0, len(lats) - 1)
+    r0 = np.minimum(np.floor(f).astype(int), len(lats) - 2)
+    return slice(j0, j1 + 1), slice(i0, i1 + 1), (r0, (f - r0).astype(np.float32)[:, None])
 
 
 JS, IS, ROWS = crop_index()
+
+
+def to_mercator(a):
+    r0, w = ROWS
+    top, bot = a[r0], a[r0 + 1]
+    out = top * (1 - w) + bot * w
+    # junto a huecos (fuera del dominio del modelo), el valor más cercano
+    near = np.where(w < 0.5, top, bot)
+    return np.where(np.isfinite(out), out, near).astype(np.float32)
 
 
 def decode(buf):
@@ -156,7 +175,7 @@ def decode(buf):
     if (g.Ni, g.Nj) != (NI, NJ):
         raise ValueError("rejilla inesperada")
     v = np.ma.filled(np.ma.asarray(g.values, dtype=np.float32), np.nan)
-    return v[JS, IS][ROWS]
+    return to_mercator(v[JS, IS])
 
 
 def fetch_hour(info, hour):
@@ -177,7 +196,7 @@ def fetch_hour(info, hour):
 def to_png(path, arr, enc):
     from PIL import Image
     code = np.where(np.isfinite(arr), np.clip(np.round(ENC[enc](arr)), 0, 254), 255).astype(np.uint8)
-    Image.fromarray(code, mode="L").save(path, optimize=True)
+    Image.fromarray(code, mode="L").save(path, compress_level=7)
 
 
 def process(stage, publish, published_run, budget):
@@ -193,10 +212,10 @@ def process(stage, publish, published_run, budget):
     if not run:
         log("  AROME: ninguna pasada completa todavía")
         return False
-    if run == published_run:
+    if ident(run) == published_run:
         log(f"  AROME: la pasada {run} ya está publicada")
         return False
-    sdir = stage / run.replace(":", "")
+    sdir = stage / ident(run).replace(":", "").replace("@", "_").replace(",", "_")
     if stage.exists():   # restos de pasadas anteriores
         for d in stage.iterdir():
             if d != sdir:
@@ -231,9 +250,9 @@ def process(stage, publish, published_run, budget):
     hours = {v: sorted(int(p.stem.split("_")[1]) for p in sdir.glob(f"{v}_*.png")) for v in ENC}
     for p in sdir.glob("*.png"):
         shutil.copy(p, publish / p.name)
-    h, w = len(ROWS), IS.stop - IS.start
+    h, w = len(ROWS[0]), IS.stop - IS.start
     dump_json(publish / "manifest.json", {
-        "model": "AROME France HD 0,01° (Météo-France)", "run": run, "generated": int(time.time()),
+        "model": "AROME France HD 0,01° (Météo-France)", "run": run, "id": ident(run), "generated": int(time.time()),
         "bbox": [S, W, N, E], "w": w, "h": h, "hours": hours,
         "enc": {"pr1": "sqrt25", "pacc": "sqrt16", "gust": "linear1", "t2m": "t40x2.5"},
     })

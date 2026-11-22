@@ -469,6 +469,16 @@ function renderLegend(def) {
   }
   const sc = SCALES[legendScale(def)];
   const stops = sc.stops.slice().reverse();
+  if (def.continuous) {   // degradado sin saltos: cada umbral en una posición equiespaciada
+    const n = stops.length - 1;
+    const grad = stops.map(([, c], i) => `${c} ${(100 * i / n).toFixed(2)}%`).join(", ");
+    const every = Math.ceil(stops.length / 10);
+    const ticks = stops.map(([t], i) => (n - i) % every ? "" :
+      `<span style="left:${(100 * i / n).toFixed(2)}%">${String(t).replace(".", ",")}</span>`).join("");
+    el.innerHTML = `<div class="lg-title">${esc(def.label)} <small>${def.unit}</small></div>
+      <div class="lg-bar lg-grad" style="background:linear-gradient(to right, ${grad})"></div><div class="lg-ticks abs">${ticks}</div>`;
+    return;
+  }
   const cells = [`<span class="lg-c" style="background:${sc.below}"></span>`].concat(stops.map(([t, c]) => `<span class="lg-c" style="background:${c}" title="> ${t}"></span>`));
   const every = Math.ceil(stops.length / 11);
   const labels = [`<span></span>`].concat(stops.map(([t], i) => `<span>${(stops.length - 1 - i) % every ? "" : String(t).replace(".", ",")}</span>`));

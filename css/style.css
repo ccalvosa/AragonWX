@@ -426,7 +426,10 @@ body.side-wide .leaflet-bottom.leaflet-right { margin-right: calc(min(920px, 100
   background: var(--card); color: var(--fg); border: 1px solid var(--border); border-radius: 7px;
   box-shadow: var(--shadow); padding: 0.15rem 0.5rem; font-size: 0.76rem; font-weight: 700; font-variant-numeric: tabular-nums;
 }
-.arome-img { image-rendering: auto; }
+.arome-canvas { position: absolute; left: 0; top: 0; opacity: 0.78; pointer-events: none; }
+.lg-grad { border-radius: 4px; }
+.lg-ticks.abs { position: relative; height: 1.1em; margin: 0 0.4rem; }
+.lg-ticks.abs span { position: absolute; transform: translateX(-50%); flex: none; }
 body.hide-stations .leaflet-marker-pane { display: none; }
 
 /* ---------- móvil ---------- */

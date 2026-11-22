@@ -48,7 +48,7 @@ jobs:
           mkdir -p out
           if git fetch --depth=1 origin arome 2>/dev/null; then
             git show FETCH_HEAD:manifest.json 2>/dev/null \
-              | python -c "import json,sys; print(json.load(sys.stdin)['run'])" > out/arome_run.txt || true
+              | python -c "import json,sys; print(json.load(sys.stdin).get('id', ''))" > out/arome_run.txt || true
           fi
           echo "publicada: $(cat out/arome_run.txt 2>/dev/null || echo ninguna)"
 
@@ -68,7 +68,8 @@ jobs:
               git add .
               git commit -q -m "arome: pasada ${run} [bot]"
               git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" arome
-            ) && echo "${run}" > out/arome_run.txt && echo "publicada la pasada ${run}"
+            ) && python -c "import json; print(json.load(open('out/arome_pub/manifest.json'))['id'])" > out/arome_run.txt \
+              && echo "publicada la pasada ${run}"
           }
           end=$(( $(date +%s) + LOOP_MINUTES * 60 ))
           while :; do

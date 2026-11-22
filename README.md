@@ -104,14 +104,15 @@ No se usa Selenium: una pasada completa tarda unos 20 segundos.
 Los paquetes horarios de Météo-France (`SP1`, `SP2`) cubren toda Francia a 0,01°. No se
 descargan enteros: se leen las cabeceras de cada mensaje GRIB con peticiones de 160 bytes
 y luego solo se bajan la temperatura, la racha y las tres precipitaciones acumuladas
-(unos 16 MB por hora). Se recortan a Aragón y alrededores, se reproyectan las filas a
+(unos 16 MB por hora). Se recortan a España dentro del dominio de AROME (37,5–45°N, 10,5°O–5°E: todo salvo el
+extremo sur peninsular y Canarias), se reproyectan las filas a
 Mercator y se guardan como PNG de 8 bits con el valor codificado. La web los colorea con
 las mismas escalas que las estaciones.
 
 Va en su propio workflow, `.github/workflows/arome.yml` (**update-arome**), separado de
 las estaciones: un bucle que cada 10 min mira si hay una pasada nueva completa (cada 3 h,
 H+00 a H+51), la procesa (unos 3 min, con un máximo de 8 por vuelta) y la publica en la
-rama `arome` (~7 MB). Dependencias en `scraper/requirements-arome.txt`.
+rama `arome` (~30 MB). Dependencias en `scraper/requirements-arome.txt`.
 
 ## SAIH desde GitHub Actions
 

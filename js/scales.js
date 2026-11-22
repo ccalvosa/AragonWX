@@ -53,6 +53,23 @@ function colorFor(scale, v) {
   return s.below;
 }
 
+/* Versión continua: interpola en RGB entre los umbrales de la escala (sin saltos).
+   Devuelve [r, g, b] o null por debajo del primer umbral en escalas con «zero». */
+const _rgb = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+function colorCont(scale, v) {
+  const s = SCALES[scale], st = s.stops;   // umbrales de mayor a menor
+  if (v == null || Number.isNaN(v)) return null;
+  if (v >= st[0][0]) return _rgb(st[0][1]);
+  for (let k = 1; k < st.length; k++) {
+    const [lo, clo] = st[k], [hi, chi] = st[k - 1];
+    if (v >= lo) {
+      const f = (v - lo) / (hi - lo), a = _rgb(clo), b = _rgb(chi);
+      return [0, 1, 2].map(i => Math.round(a[i] + (b[i] - a[i]) * f));
+    }
+  }
+  return s.zero ? null : _rgb(s.below);
+}
+
 /* Texto legible sobre un fondo de color */
 function inkFor(hex) {
   const h = hex.replace("#", "");
