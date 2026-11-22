@@ -52,6 +52,10 @@ descarga los datos cada 10 minutos y los publica en la rama `data`.
   elevación más baja; cada producto, una imagen cada 10 min; últimas 3 horas. `scraper/aragonwx/radar.py` y el flujo `update-radar`
   (bucle de 1 min) la publican en la rama `radar`; la web pinta cada píxel con su
   celda del radar, sin estirar ni suavizar.
+  **Lluvia estimada** de 1 h y 24 h con la exploración de largo alcance (24 h guardadas
+  en `arch/`): Marshall-Palmer (Z = 200·R^1,6, de 7 a 55 dBZ), sin las celdas de ecos
+  fijos (mapa de frecuencia de eco con memoria de ~2 días, `clutter.png`) y corregida
+  con un único factor frente a los pluviómetros de AEMET (lluvia de 24 h de `now.json`).
 - **Krigeado** a resolución de pantalla en cada zoom. En temperatura (actual, máxima
   y mínima) tiene en cuenta la altitud: se ajusta a las estaciones una recta con la
   altitud, o dos tramos si hay inversión (la leyenda muestra el gradiente), se krigean

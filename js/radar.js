@@ -10,6 +10,7 @@
      zh  reflectividad de alta resolución: exploración Doppler, 150 km, 500 m
      zl  reflectividad de baja resolución: largo alcance, 250 km, 1 km
      v   velocidad radial: exploración Doppler
+     a1, a24  lluvia estimada en 1 y 24 h (largo alcance, corregida con pluviómetros)
 
    La capa pinta cada píxel de la pantalla con la celda del radar que le
    corresponde, sin estirar ni suavizar: se ve la resolución real a cualquier zoom.
@@ -22,6 +23,8 @@ const Radar = (() => {
     zh: { label: "Reflectividad · alta resolución", unit: "dBZ", scale: "dbz", kind: "dop", q: "z", what: "exploración Doppler: 500 m hasta 150 km" },
     zl: { label: "Reflectividad · baja resolución", unit: "dBZ", scale: "dbz", kind: "lr", q: "z", what: "largo alcance: 1 km hasta 250 km" },
     v:  { label: "Velocidad radial", unit: "m/s", scale: "vrad", kind: "dop", q: "v", what: "exploración Doppler: 500 m hasta 150 km" },
+    a1:  { label: "Lluvia estimada en 1 hora", unit: "mm", scale: "prec1h", q: "a1", acc: "h1" },
+    a24: { label: "Lluvia estimada en 24 horas", unit: "mm", scale: "prec", q: "a24", acc: "h24" },
   };
   const Q = () => MODES[mode].q;
   let M = null, mode = "zh", layer = null, cur = null, token = 0, timer = null, marks = null;
@@ -35,7 +38,12 @@ const Radar = (() => {
     z: (() => { const t = new Uint8ClampedArray(256 * 4); for (let c = 1; c < 256; c++) { const v = c / 2 - 32; if (v >= ZMIN) t.set(rgb(colorFor("dbz", v)), c * 4); } return t; })(),
     v: (() => { const t = new Uint8ClampedArray(256 * 4); for (let c = 1; c < 256; c++) t.set(rgb(colorFor("vrad", (c - 128) / 3)), c * 4); return t; })(),
   };
-  const decode = { z: c => c / 2 - 32, v: c => (c - 128) / 3 };
+  for (const [q, sc] of [["a1", "prec1h"], ["a24", "prec"]]) {   // lluvia: código = √mm · 16
+    const t = new Uint8ClampedArray(256 * 4);
+    for (let c = 1; c < 256; c++) { const mm = (c / 16) ** 2; if (mm >= 0.1) t.set(rgb(colorFor(sc, mm)), c * 4); }
+    LUT[q] = t;
+  }
+  const decode = { z: c => c / 2 - 32, v: c => (c - 128) / 3, a1: c => (c / 16) ** 2, a24: c => (c / 16) ** 2 };
 
   function png(name) {
     if (!cache.has(name)) {
@@ -58,6 +66,7 @@ const Radar = (() => {
   function frames() {
     if (!M) return [];
     const d = MODES[mode];
+    if (d.acc) return M.acc ? [{ t: Date.parse(M.acc.t), rf: { ...M.acc, z: M.acc[d.acc], elev: 0.5 } }] : [];
     return M.frames.filter(f => f.kind === d.kind && (d.q === "z" || f.v)).map(f => ({ t: Date.parse(f.t), rf: f }));
   }
   const fileOf = f => (Q() === "v" ? f.v : f.z);
@@ -157,7 +166,8 @@ const Radar = (() => {
     if (!layer || !S.layers.radar) { tip.hidden = true; return; }
     const r = valueAt(e.latlng.lat, e.latlng.lng);
     if (!r) { tip.hidden = true; return; }
-    tip.textContent = cur.q === "z" ? `Radar ${Math.round(r.v)} dBZ · a ${Math.round(r.km)} km`
+    tip.textContent = cur.q.startsWith("a") ? `Radar ${fmt(r.v, r.v < 10 ? 1 : 0)} mm en ${cur.q === "a1" ? "1 h" : "24 h"} (estimado)`
+      : cur.q === "z" ? `Radar ${Math.round(r.v)} dBZ · a ${Math.round(r.km)} km`
       : `Radar ${r.v > 0 ? "+" : ""}${fmt(r.v, 1)} m/s · ${Math.abs(r.v) < 1 ? "casi nula" : r.v > 0 ? "se aleja" : "se acerca"}`;
     tip.style.left = e.containerPoint.x + 14 + "px";
     tip.style.top = e.containerPoint.y - 10 + "px";
@@ -175,8 +185,21 @@ const Radar = (() => {
     el.innerHTML = `<div class="lg-title">${d.label} <small>${d.unit}</small></div>
       <div class="lg-bar">${stops.map(([t, c]) => `<span class="lg-c" style="background:${c}" title="> ${t}"></span>`).join("")}</div>
       <div class="lg-ticks">${stops.map(([t], i) => `<span>${i % every ? "" : String(t).replace(".", ",")}</span>`).join("")}</div>
-      <p class="hint">${esc(M.site.name)} · elevación ${f ? String(f.elev).replace(".", ",") : "0,5"}° · ${d.what} · una imagen cada 10 min
-        ${mode === "v" ? "<br>Verde: se acerca al radar · rojo: se aleja. Sin corregir el plegado de velocidades (±40 m/s)." : ""}</p>`;
+      <p class="hint">${d.acc ? accNote(d) : `${esc(M.site.name)} · elevación ${f ? String(f.elev).replace(".", ",") : "0,5"}° · ${d.what} · una imagen cada 10 min
+        ${mode === "v" ? "<br>Verde: se acerca al radar · rojo: se aleja. Sin corregir el plegado de velocidades (±40 m/s)." : ""}`}</p>`;
+  }
+  /* explicación de la lluvia estimada: hasta cuándo, cobertura y corrección con pluviómetros */
+  function accNote(d) {
+    const a = M.acc;
+    if (!a) return "Todavía no hay acumulados.";
+    const h1 = d.acc === "h1", n = h1 ? a.n1 : a.n24, e = h1 ? a.e1 : a.e24;
+    const t = new Date(a.t).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+    const cov = n >= e ? "" : n >= (h1 ? 4 : 0.8 * e) ? ` (faltan ${e - n} imágenes; se ha completado el hueco)`
+      : ` · <b>incompleto: solo ${Math.round(n * 10 / 60 * 10) / 10} h de datos</b>`;
+    const bias = a.bias ? `corregida con ${a.pairs} pluviómetros de AEMET (el radar se multiplica por ${a.bias.toFixed(2).replace(".", ",")})`
+      : "sin corregir con pluviómetros (pocos con lluvia o faltan datos)";
+    return `Hasta las ${t}${cov} · largo alcance (1 km, 250 km) · intensidad con Marshall-Palmer, ${bias}. `
+      + `No cuenta ${a.clutter} celdas con ecos fijos del terreno. Es una estimación: el radar ve la lluvia en altura y lejos del radar se queda corto.`;
   }
 
   async function load() {

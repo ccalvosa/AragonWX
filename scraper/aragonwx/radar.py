@@ -12,6 +12,10 @@ De cada fichero se toma la elevación más baja y se guarda en coordenadas polar
 La web pinta cada píxel de la pantalla con la celda del radar que le corresponde.
 Se conservan las últimas KEEP_H horas y manifest.json las describe.
 
+Además, con la exploración de largo alcance de las últimas 24 h (carpeta arch/),
+se publica la lluvia estimada de 1 h y de 24 h, corregida con los pluviómetros:
+  a1h_AAAAMMDDTHHMM.png, a24h_….png   código = √mm · 16 (0 = menos de 0,1 mm)
+
     python -m aragonwx.radar --pub ../out/radar_pub
 """
 import argparse
@@ -38,9 +42,9 @@ KEY_RE = re.compile(r"@(\d{8}T\d{4})@[\d._]+@([A-Z_]+)\.h5$")
 UA = {"User-Agent": "AragonWX (estaciones de Aragón; github.com/ccalvosa/AragonWX)"}
 
 
-def list_keys(ses, now):
-    """Claves del radar de hoy (y de ayer si hace falta para cubrir KEEP_H) en el primer bucket que responda."""
-    days = {now.date(), (now - dt.timedelta(hours=KEEP_H)).date()}
+def list_keys(ses, now, hours=KEEP_H):
+    """Claves del radar de las últimas `hours` horas (por días) en el primer bucket que responda."""
+    days = {now.date(), (now - dt.timedelta(hours=hours)).date()}
     for ep in ENDPOINTS:
         keys = []
         try:
@@ -113,24 +117,176 @@ def save_png(arr, path):
     Image.fromarray(arr, "L").save(path, optimize=True)
 
 
+def utc(stamp):
+    return dt.datetime.strptime(stamp, "%Y%m%dT%H%M").replace(tzinfo=dt.timezone.utc)
+
+
+# ---------- lluvia estimada (acumulados de 1 h y 24 h) ----------
+# Cada exploración de largo alcance (cada 10 min) se convierte en intensidad con
+# Marshall-Palmer (Z = 200·R^1,6), por debajo de ZMIN_RAIN dBZ no llueve y el dBZ se
+# limita a ZMAX_RAIN para que el granizo no dispare el acumulado; cada imagen cuenta
+# 10 min. El de 24 h se corrige con un único factor (sesgo medio) frente a los
+# pluviómetros de AEMET (p24 de now.json): suma de pluviómetros / suma del radar.
+ZMIN_RAIN, ZMAX_RAIN = 7.0, 55.0
+STEP_MIN = 10
+DATA_NOW = "https://raw.githubusercontent.com/ccalvosa/AragonWX/data/now.json"
+BACKFILL = 30            # descargas por pasada para rellenar el archivo de 24 h
+BIAS_MIN_PAIRS, BIAS_RANGE = 5, (0.25, 4.0)
+# Ecos fijos (montañas, edificios): frecuencia de eco de cada celda con una media
+# exponencial de ~2 días; las celdas con eco más de la mitad del tiempo no suman lluvia.
+CLUTTER_TAU, CLUTTER_ON, CLUTTER_SEED = 288, 0.5, 0.9
+
+
+def rain_rate(code):
+    dbz = code.astype(np.float64) / 2 - 32
+    ok = (code > 0) & (dbz >= ZMIN_RAIN)
+    z = 10 ** (np.minimum(dbz, ZMAX_RAIN) / 10)
+    r = (z / 200) ** (1 / 1.6)
+    r[~ok] = 0
+    return r
+
+
+def polar_index(geo, site, lat, lon):
+    """(rayo, celda, distancia en km) de un punto, o None fuera del alcance."""
+    R = 6371000.0
+    la0, lo0, la, lo = map(np.radians, (site["lat"], site["lon"], lat, lon))
+    d = lo - lo0
+    x = np.cos(la) * np.sin(d)
+    y = np.cos(la0) * np.sin(la) - np.sin(la0) * np.cos(la) * np.cos(d)
+    dist = R * np.hypot(x, y)
+    az = (np.degrees(np.arctan2(x, y)) + 360) % 360
+    b = int((dist - geo["rstart"]) // geo["rscale"])
+    if b < 0 or b >= geo["nbins"]:
+        return None
+    ray = int(((az - geo["az0"] + 720) % 360) * geo["nrays"] / 360) % geo["nrays"]
+    return ray, b, dist / 1000
+
+
+def gauge_bias(ses, acc24, geo, site, t_last):
+    """Factor pluviómetros / radar con las estaciones de AEMET que tienen lluvia en 24 h."""
+    try:
+        doc = ses.get(DATA_NOW, params={"t": int(t_last.timestamp() // 60)}, timeout=30).json()
+    except Exception as e:
+        print(f"radar: sin now.json para corregir la lluvia ({e})", file=sys.stderr)
+        return None, 0
+    if abs(doc.get("ts", 0) - t_last.timestamp()) > 2 * 3600:
+        return None, 0
+    c = {k: i for i, k in enumerate(doc["cols"])}
+    pairs = []
+    for row in doc["rows"]:
+        if row[c["src"]] != "AEMET" or row[c["st"]] != "ok" or row[c["p24"]] is None:
+            continue
+        ix = polar_index(geo, site, row[c["lat"]], row[c["lon"]])
+        if not ix or ix[2] < 15:   # junto al radar, el cono de silencio
+            continue
+        g, r = float(row[c["p24"]]), float(acc24[ix[0], ix[1]])
+        if g >= 0.5 and r >= 0.5:
+            pairs.append((g, r))
+    if len(pairs) < BIAS_MIN_PAIRS or sum(r for _, r in pairs) < 5:
+        return None, len(pairs)
+    f = sum(g for g, _ in pairs) / sum(r for _, r in pairs)
+    return round(min(max(f, BIAS_RANGE[0]), BIAS_RANGE[1]), 3), len(pairs)
+
+
+def accumulate(ses, pub, man):
+    """Recalcula los acumulados si hay exploraciones nuevas en el archivo. Devuelve True si cambian."""
+    arch, geo = pub / "arch", man.get("arch_geo")
+    files = sorted(arch.glob("z_*.png")) if arch.exists() else []
+    if not files or not geo:
+        return False
+    t_last = utc(files[-1].stem[2:])
+    sig = f"{files[-1].stem}:{len(files)}"
+    if man.get("acc", {}).get("sig") == sig:
+        return False
+    acc1 = np.zeros((geo["nrays"], geo["nbins"]))
+    acc24 = np.zeros_like(acc1)
+    echo = np.zeros_like(acc1)
+    n1 = n24 = 0
+    last_echo = None
+    for p in files:
+        age = (t_last - utc(p.stem[2:])).total_seconds() / 60
+        if age >= 24 * 60:
+            continue
+        a = np.asarray(Image.open(p))
+        if a.shape != acc1.shape:
+            continue
+        rr = rain_rate(a)
+        r = rr * STEP_MIN / 60
+        acc24 += r; n24 += 1
+        echo += rr > 0
+        if age < 60:
+            acc1 += r; n1 += 1
+        if age == 0:
+            last_echo = rr > 0
+    e1, e24 = 60 // STEP_MIN, 24 * 60 // STEP_MIN
+    # mapa de ecos fijos
+    cpath = pub / "clutter.png"
+    freq24 = echo / max(n24, 1)
+    if cpath.exists():
+        cl = np.asarray(Image.open(cpath)).astype(np.float64) / 250
+        if cl.shape != acc1.shape:
+            cl = None
+    else:
+        cl = None
+    new_last = man.get("acc", {}).get("t") != t_last.strftime("%Y-%m-%dT%H:%MZ")
+    if cl is None and n24 >= 0.8 * e24:
+        cl = freq24.copy()   # primera vez con 24 h completas
+    elif cl is not None and new_last and last_echo is not None:
+        cl += (last_echo - cl) / CLUTTER_TAU
+    if cl is not None:
+        Image.fromarray(np.round(cl * 250).astype(np.uint8), "L").save(cpath, optimize=True)
+        fixed = cl >= CLUTTER_ON
+    else:
+        fixed = (freq24 >= CLUTTER_SEED) if n24 >= 18 else np.zeros_like(acc1, bool)   # ≥ 3 h de imágenes
+    acc1[fixed] = 0
+    acc24[fixed] = 0
+    # imágenes que faltan: se reparten solo si faltan pocas (si no, se publica lo que hay)
+    if e1 > n1 >= 4:
+        acc1 *= e1 / n1
+    if e24 > n24 >= 0.8 * e24:
+        acc24 *= e24 / n24
+    bias, npairs = gauge_bias(ses, acc24, geo, man["site"], t_last) if n24 >= 0.8 * e24 else (None, 0)
+    f = bias or 1.0
+    stamp = t_last.strftime("%Y%m%dT%H%M")
+    code = lambda acc: np.where(acc * f >= 0.1, np.clip(np.round(np.sqrt(acc * f) * 16), 1, 254), 0).astype(np.uint8)
+    for old in list(pub.glob("a1h_*.png")) + list(pub.glob("a24h_*.png")):
+        old.unlink()
+    save_png(code(acc1), pub / f"a1h_{stamp}.png")
+    save_png(code(acc24), pub / f"a24h_{stamp}.png")
+    man["acc"] = {"t": t_last.strftime("%Y-%m-%dT%H:%MZ"), "h1": f"a1h_{stamp}.png", "h24": f"a24h_{stamp}.png",
+                  "n1": n1, "n24": n24, "e1": e1, "e24": e24, "bias": bias, "pairs": npairs, "sig": sig,
+                  "clutter": int(fixed.sum()), "clutter_map": cl is not None,
+                  "acode": "mm = (c/16)^2", "zr": "Marshall-Palmer Z = 200·R^1,6", **geo}
+    print(f"radar: lluvia 1 h ({n1}/{e1}) y 24 h ({n24}/{e24}) a las {man['acc']['t']}, "
+          f"corrección {bias if bias else 'ninguna'} con {npairs} pluviómetros; {int(fixed.sum())} celdas de ecos fijos; "
+          f"máx. 24 h {acc24.max() * f:.1f} mm")
+    return True
+
+
 def run(pub: Path, now=None):
     now = now or dt.datetime.now(dt.timezone.utc)
     pub.mkdir(parents=True, exist_ok=True)
+    arch = pub / "arch"
+    arch.mkdir(exist_ok=True)
     mpath = pub / "manifest.json"
     man = json.loads(mpath.read_text()) if mpath.exists() else {"frames": []}
     have = {f["t"] for f in man["frames"]}
     cutoff = (now - dt.timedelta(hours=KEEP_H)).strftime("%Y%m%dT%H%M")
+    cut24 = (now - dt.timedelta(hours=24, minutes=20)).strftime("%Y%m%dT%H%M")
     ses = requests.Session()
     ses.headers.update(UA)
-    ep, keys = list_keys(ses, now)
-    new = 0
-    for key in sorted(keys):
+    ep, keys = list_keys(ses, now, hours=25)
+    new = backfilled = 0
+    for key in sorted(keys, reverse=True):   # de la más reciente hacia atrás (el relleno empieza por la última hora)
         m = KEY_RE.search(key)
         if not m:
             continue
         stamp, qty = m.groups()
-        t = dt.datetime.strptime(stamp, "%Y%m%dT%H%M").replace(tzinfo=dt.timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
-        if stamp < cutoff or t in have:
+        t = utc(stamp).strftime("%Y-%m-%dT%H:%MZ")
+        recent = stamp >= cutoff and t not in have
+        # el archivo de 24 h solo guarda la de largo alcance (sin VRADH)
+        to_arch = "VRADH" not in qty and stamp >= cut24 and not (arch / f"z_{stamp}.png").exists()
+        if not recent and not (to_arch and backfilled < BACKFILL):
             continue
         try:
             r = ses.get(f"{ep}/{key}", timeout=60)
@@ -139,6 +295,14 @@ def run(pub: Path, now=None):
         except Exception as e:   # un fichero roto no para el resto
             print(f"radar: {key} no se ha podido leer ({e})", file=sys.stderr)
             continue
+        man["site"] = {"id": SITE, "name": NAME, "lat": d["lat"], "lon": d["lon"], "h": d["h"]}
+        if d["v"] is None:
+            save_png(d["z"], arch / f"z_{stamp}.png")
+            man["arch_geo"] = {k: d[k] for k in ("nbins", "nrays", "rscale", "rstart", "az0")}
+            if not recent:
+                backfilled += 1
+        if not recent:
+            continue
         save_png(d["z"], pub / f"z_{stamp}.png")
         fr = {"t": t, "kind": "dop" if d["v"] is not None else "lr", "z": f"z_{stamp}.png",
               **{k: d[k] for k in ("nbins", "nrays", "rscale", "rstart", "az0", "elev")}}
@@ -146,24 +310,29 @@ def run(pub: Path, now=None):
             save_png(d["v"], pub / f"v_{stamp}.png")
             fr["v"] = f"v_{stamp}.png"
         man["frames"].append(fr)
-        man["site"] = {"id": SITE, "name": NAME, "lat": d["lat"], "lon": d["lon"], "h": d["h"]}
         have.add(t)
         new += 1
-    # fuera lo que ya no entra en la ventana
+    # fuera lo que ya no entra en las ventanas
     keep = [f for f in man["frames"] if f["t"].replace("-", "").replace(":", "")[:13] >= cutoff]
     gone = len(man["frames"]) - len(keep)
     man["frames"] = sorted(keep, key=lambda f: f["t"])
-    used = {f["z"] for f in keep} | {f.get("v") for f in keep}
+    for p in arch.glob("z_*.png"):
+        if p.stem[2:] < cut24:
+            p.unlink()
+    acc = accumulate(ses, pub, man)
+    used = {f["z"] for f in keep} | {f.get("v") for f in keep} | {man.get("acc", {}).get("h1"), man.get("acc", {}).get("h24"), "clutter.png"}
     for p in pub.glob("*.png"):
         if p.name not in used:
             p.unlink()
-    if new or gone or not mpath.exists():
+    changed = bool(new or gone or backfilled or acc)
+    if changed or not mpath.exists():
         man.update({"updated": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "source": "EUMETNET OPERA (CC BY 4.0) · AEMET",
                     "zcode": "dBZ = c/2 - 32", "vcode": "m/s = (c - 128)/3", "keep_h": KEEP_H})
         mpath.write_text(json.dumps(man, separators=(",", ":")))
     last = man["frames"][-1]["t"] if man["frames"] else "ninguna"
-    print(f"radar: {new} nuevas, {gone} retiradas, {len(man['frames'])} en total, última {last}")
-    return bool(new or gone)
+    print(f"radar: {new} nuevas, {gone} retiradas, {backfilled} al archivo de 24 h "
+          f"({len(list(arch.glob('z_*.png')))} en total), {len(man['frames'])} en la animación, última {last}")
+    return changed
 
 
 def main():

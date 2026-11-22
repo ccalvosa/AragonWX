@@ -757,7 +757,7 @@ function syncTools() {
   const mark = (box, v) => $$(box + " button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
   mark("#radar-opts", rm); mark("#sat-opts", sm); mark("#model-opts", am);
   const state = (btn, on, txt) => { $(btn).classList.toggle("on", on); $(btn + " .tool-state").textContent = txt; };
-  state("#btn-radar", rm !== "off", { zh: "alta resolución", zl: "baja resolución", v: "velocidad" }[rm] || "");
+  state("#btn-radar", rm !== "off", { zh: "alta resolución", zl: "baja resolución", v: "velocidad", a1: "lluvia 1 h", a24: "lluvia 24 h" }[rm] || "");
   state("#btn-sat", sm !== "off" || !!S.layers.li, [sm !== "off" && SATNAME[sm].toLowerCase(), S.layers.li && "rayos"].filter(Boolean).join(" + "));
   state("#btn-model", am !== "off", am !== "off" ? "AROME · " + MODELNAME[am] : "");
   applyHide();
@@ -787,7 +787,7 @@ function refreshTimebar(goLast) {
   if (goLast || TB.i >= frames.length) TB.i = frames.length - 1;
   r.value = TB.i;
   $("#timebar").hidden = false;
-  $("#tb-what").textContent = [radarOn && ({ zh: "Radar · alta resolución", zl: "Radar · baja resolución", v: "Radar · velocidad radial" }[Radar.mode()]), S.layers.sat && "Satélite", S.layers.li && "Rayos"].filter(Boolean).join(" · ");
+  $("#tb-what").textContent = [radarOn && ({ zh: "Radar · alta resolución", zl: "Radar · baja resolución", v: "Radar · velocidad radial", a1: "Radar · lluvia estimada 1 h", a24: "Radar · lluvia estimada 24 h" }[Radar.mode()]), S.layers.sat && "Satélite", S.layers.li && "Rayos"].filter(Boolean).join(" · ");
   showFrame(TB.i);
 }
 
