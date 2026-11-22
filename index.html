@@ -21,7 +21,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
-<link rel="stylesheet" href="css/style.css?v=15">
+<link rel="stylesheet" href="css/style.css?v=16">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 </head>
@@ -126,7 +126,14 @@
           <label class="check"><input type="checkbox" id="lyr-avisos"> Avisos de AEMET</label>
           <label class="check sub-check"><input type="checkbox" id="avisos-ar"> Avisos: solo Aragón</label>
           <label class="check"><input type="checkbox" id="lyr-interp"> Interpolación (krigeado)</label>
-          <label class="check"><input type="checkbox" id="lyr-radar"> Radar de precipitación</label>
+          <label class="check"><input type="checkbox" id="lyr-radar"> Radar de Zaragoza (AEMET)</label>
+          <div class="sat-mode" id="radar-mode" hidden>
+            <div class="seg seg-sm">
+              <button data-rm="z" class="on">Reflectividad</button>
+              <button data-rm="v">Velocidad radial</button>
+            </div>
+            <div class="radar-info" id="radar-info"></div>
+          </div>
           <label class="check"><input type="checkbox" id="lyr-sat"> Satélite (MTG)</label>
           <label class="check"><input type="checkbox" id="lyr-li"> Rayos (MTG-LI)</label>
           <label class="check"><input type="checkbox" id="lyr-arome"> Previsión AROME 1,3 km</label>
@@ -194,11 +201,12 @@
   <div class="loading" id="loading"><div class="spinner"></div><span>Cargando estaciones…</span></div>
 </main>
 
-<script src="js/scales.js?v=3"></script>
+<script src="js/scales.js?v=4"></script>
 <script src="js/kriging.js?v=3"></script>
 <script src="js/forecast.js?v=2"></script>
-<script src="js/app.js?v=17"></script>
+<script src="js/app.js?v=18"></script>
 <script src="js/arome.js?v=5"></script>
+<script src="js/radar.js?v=1"></script>
 <script src="js/aemethist.js?v=3"></script>
 <script src="js/avisos.js?v=2"></script>
 <script src="js/summary.js?v=4"></script>

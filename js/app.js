@@ -280,7 +280,7 @@ function renderStats() {
   for (const s of Object.values(st)) { ok += s.ok || 0; n += (s.n || 0) - (s.na || 0); }
   $("#stats").innerHTML = `<b>${ok}</b> de ${n} estaciones con datos · ${ago(NOW.ts)}<br>
     <a href="https://github.com/${REPO}" target="_blank" rel="noopener">Código y datos</a> ·
-    Radar <a href="https://www.rainviewer.com" target="_blank" rel="noopener">RainViewer</a> ·
+    Radar <a href="https://www.eumetnet.eu/observations/opera/" target="_blank" rel="noopener">EUMETNET OPERA</a> (AEMET) ·
     Satélite <a href="https://view.eumetsat.int" target="_blank" rel="noopener">EUMETSAT</a><br>
     <a href="estado.html">Estado del sistema</a> · <button class="link-btn small" id="btn-editor">Editar la red</button>`;
   $("#btn-editor").addEventListener("click", () => Editor.open());
@@ -652,7 +652,7 @@ function interpNote(txt) {
 }
 
 /* ---------------------------------------------------------- capas extra */
-let radarLayer = null, satLayer = null, liLayer = null, RADAR = null;
+let satLayer = null, liLayer = null;
 
 async function toggleLayer(key) {
   const on = S.layers[key];
@@ -680,8 +680,8 @@ async function toggleLayer(key) {
     return;
   }
   if (key === "radar") {
-    if (!on) { radarLayer && map.removeLayer(radarLayer); radarLayer = null; refreshTimebar(); return; }
-    try { RADAR = await getJSON("https://api.rainviewer.com/public/weather-maps.json"); }
+    if (!on) { Radar.stop(); refreshTimebar(); return; }
+    try { await Radar.start(); }
     catch { S.layers.radar = false; $("#lyr-radar").checked = false; return toast("El radar no está disponible ahora."); }
     refreshTimebar(true);
     return;
@@ -701,6 +701,8 @@ function camPopup(c) {
     <a class="btn-link" href="${esc(c.link)}" target="_blank" rel="noopener">${c.img ? "Abrir imagen" : "Ver la cámara"} ↗</a></div>`;
 }
 
+$$("#radar-mode [data-rm]").forEach(b => b.addEventListener("click", () => { Radar.setMode(b.dataset.rm); refreshTimebar(true); }));
+
 /* ---------- barra de tiempo: radar, satélite, rayos y animación AEMET */
 const SAT_LAYERS = { ir: "mtg_fd:ir105_hrfi", vis: "mtg_fd:vis06_hrfi", geo: "mtg_fd:rgb_geocolour" };
 const EUM_WMS = "https://view.eumetsat.int/geoserver/ows";
@@ -713,19 +715,19 @@ function satTimes(n = 18) {   // instantes de 10 min, con ~20 min de retraso de 
 
 function refreshTimebar(goLast) {
   if (S.anim === "obs10" || S.anim === "arome") return;
-  const radarOn = S.layers.radar && RADAR, satOn = S.layers.sat || S.layers.li;
+  const radarOn = S.layers.radar && Radar.ready(), satOn = S.layers.sat || S.layers.li;
   if (!radarOn && !satOn) { stopTimebar(); return; }
   let frames;
-  if (radarOn) frames = [...RADAR.radar.past, ...(RADAR.radar.nowcast || [])].map(f => ({ t: f.time * 1000, path: f.path, nowcast: f.time * 1000 > Date.now() }));
+  if (radarOn) frames = Radar.frames();
   else frames = satTimes().map(t => ({ t }));
   TB.frames = frames;
   S.anim = "layers";
   const r = $("#tb-range");
   r.max = frames.length - 1;
-  if (goLast) TB.i = frames.findLastIndex ? Math.max(0, frames.findLastIndex(f => !f.nowcast)) : frames.length - 1;
+  if (goLast || TB.i >= frames.length) TB.i = frames.length - 1;
   r.value = TB.i;
   $("#timebar").hidden = false;
-  $("#tb-what").textContent = [radarOn && "Radar", S.layers.sat && "Satélite", S.layers.li && "Rayos"].filter(Boolean).join(" · ");
+  $("#tb-what").textContent = [radarOn && (Radar.mode() === "v" ? "Radar · velocidad radial" : "Radar de Zaragoza"), S.layers.sat && "Satélite", S.layers.li && "Rayos"].filter(Boolean).join(" · ");
   showFrame(TB.i);
 }
 
@@ -736,13 +738,7 @@ function showFrame(i) {
   const f = TB.frames[TB.i];
   if (!f) return;
   $("#tb-label").textContent = new Date(f.t).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) + (f.nowcast ? " (previsión)" : "");
-  if (S.layers.radar && RADAR && f.path) {
-    const url = `${RADAR.host}${f.path}/256/{z}/{x}/{y}/4/1_1.png`;
-    const nl = L.tileLayer(url, { pane: "radar", opacity: 0.75, maxNativeZoom: 7, maxZoom: 17, attribution: "RainViewer" });
-    nl.on("load", () => { if (radarLayer && radarLayer !== nl) map.removeLayer(radarLayer); radarLayer = nl; });
-    nl.addTo(map);
-    if (!radarLayer) radarLayer = nl;
-  }
+  if (S.layers.radar && f.rf) Radar.show(f.rf);
   const satT = new Date(Math.min(f.t, Date.now() - 20 * 60e3) - (Math.min(f.t, Date.now() - 20 * 60e3) % 600e3)).toISOString().slice(0, 19) + "Z";
   if (S.layers.sat) {
     if (!satLayer) satLayer = L.tileLayer.wms(EUM_WMS, { layers: SAT_LAYERS[S.sat], format: "image/jpeg", transparent: false, version: "1.3.0", pane: "sat", opacity: 0.9, attribution: "EUMETSAT", time: satT }).addTo(map);

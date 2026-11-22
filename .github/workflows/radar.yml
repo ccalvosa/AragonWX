@@ -1,0 +1,91 @@
+name: update-radar
+
+# Radar de Zaragoza (AEMET, Perdiguera) desde EUMETNET OPERA para la capa del mapa.
+#
+# Va aparte de update-data. Mismo esquema que AROME: un bucle de ~5,5 h que cada
+# minuto mira si han llegado volúmenes nuevos (uno cada 5 min, alternando la
+# exploración Doppler y la de largo alcance), los convierte y, si hay cambios,
+# publica las últimas 3 horas en la rama «radar» (un único commit, push forzado).
+# Al terminar se relanza a sí mismo; el cron queda como red de seguridad.
+
+on:
+  schedule:
+    - cron: "23 */2 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: update-radar
+  cancel-in-progress: false
+
+jobs:
+  radar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      LOOP_MINUTES: 330
+      EVERY: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scraper/requirements-radar.txt
+
+      - run: pip install -r scraper/requirements-radar.txt
+
+      - name: Imágenes ya publicadas
+        run: |
+          mkdir -p out/radar_pub
+          if git fetch --depth=1 origin radar 2>/dev/null; then
+            git archive FETCH_HEAD | tar -x -C out/radar_pub
+          fi
+          echo "publicadas: $(ls out/radar_pub | grep -c '^z_' || true)"
+
+      - name: Bucle de proceso y publicación
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global user.name "aragonwx-bot"
+          git config --global user.email "actions@users.noreply.github.com"
+          publish_radar() {
+            rm -rf pubrd && cp -r out/radar_pub pubrd
+            (
+              cd pubrd
+              git init -q
+              git checkout -q -b radar
+              git add .
+              git commit -q -m "radar: $(date -u +%FT%H:%MZ) [bot]"
+              git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" radar
+            ) && echo "publicado"
+          }
+          end=$(( $(date +%s) + LOOP_MINUTES * 60 ))
+          n=0
+          while :; do
+            start=$(date +%s)
+            # el código se actualiza cada ~15 min, no en cada vuelta
+            if [ $(( n % 15 )) -eq 0 ]; then
+              git pull -q --rebase origin "${GITHUB_REF_NAME}" || echo "::warning::no se pudo actualizar el código"
+              pip install -q -r scraper/requirements-radar.txt || true
+            fi
+            n=$(( n + 1 ))
+            (cd scraper && python -m aragonwx.radar --pub ../out/radar_pub --flag ../out/radar_ready) \
+              || echo "::warning::el radar ha fallado"
+            [ -f out/radar_ready ] && { publish_radar && rm -f out/radar_ready || echo "::warning::no se pudo publicar el radar"; }
+            now=$(date +%s)
+            [ $(( now + EVERY )) -lt $end ] || break
+            sleep $(( EVERY - (now - start) > 0 ? EVERY - (now - start) : 1 ))
+          done
+
+      - name: Relanzar la cadena
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run radar.yml --ref "${GITHUB_REF_NAME}" -R "${GITHUB_REPOSITORY}"

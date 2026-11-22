@@ -43,9 +43,15 @@ descarga los datos cada 10 minutos y los publica en la rama `data`.
   y la web abre sin conexión; los datos nunca se guardan.
 - **Animación** de las últimas 24 h de AEMET cada 10 minutos (estaciones de la zona visible).
 - **Ranking** de las estaciones de la zona visible del mapa (Aragón, una comarca o toda España).
-- **Capas**: interpolación por krigeado recortada a Aragón, radar (RainViewer),
+- **Capas**: interpolación por krigeado recortada a Aragón, radar de Zaragoza,
   satélite MTG (infrarrojo, visible, GeoColor) y rayos MTG-LI de EUMETSAT, webcams
   (propias y de la DGT), red manual de AEMET y límites provinciales.
+- **Radar de Zaragoza** (AEMET, Perdiguera) desde EUMETNET OPERA (CC BY 4.0):
+  reflectividad y velocidad radial de la elevación más baja, una imagen cada 5 min
+  (alterna la exploración Doppler, 150 km a 500 m, y la de largo alcance, 250 km a
+  1 km), últimas 3 horas. `scraper/aragonwx/radar.py` y el flujo `update-radar`
+  (bucle de 1 min) la publican en la rama `radar`; la web pinta cada píxel con su
+  celda del radar, sin estirar ni suavizar.
 - **Krigeado** a resolución de pantalla en cada zoom. En temperatura (actual, máxima
   y mínima) tiene en cuenta la altitud: se ajusta a las estaciones una recta con la
   altitud, o dos tramos si hay inversión (la leyenda muestra el gradiente), se krigean
