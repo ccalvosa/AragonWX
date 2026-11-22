@@ -332,7 +332,8 @@ let markersById = new Map();
 
 function makeCluster(scaleKey) {
   return L.markerClusterGroup({
-    maxClusterRadius: z => (z >= 10 ? 18 : 30), disableClusteringAtZoom: 12, showCoverageOnHover: false,
+    // reglas de la web anterior: agrupar etiquetas a menos de 20 px hasta el zoom 15
+    maxClusterRadius: 20, disableClusteringAtZoom: 15, showCoverageOnHover: false,
     spiderfyOnMaxZoom: false, chunkedLoading: true, animate: false,
     iconCreateFunction: cl => {
       const vals = cl.getAllChildMarkers().map(m => m.options.v).filter(v => v != null).sort((a, b) => a - b);
@@ -340,7 +341,7 @@ function makeCluster(scaleKey) {
       const med = vals.length ? (vals.length % 2 ? vals[mid] : (vals[mid - 1] + vals[mid]) / 2) : null;
       const c = colorFor(scaleKey, med), d = cl.getAllChildMarkers()[0]?.options.dec ?? 1;
       return L.divIcon({ className: "vm-wrap", iconSize: null,
-        html: `<span class="vm cl" style="background:${c};color:${inkFor(c)}">${fmt(med, d)}<sup>${cl.getChildCount()}</sup></span>` });
+        html: `<span class="vm cl" title="Mediana de ${cl.getChildCount()} estaciones" style="background:${c};color:${inkFor(c)}">${fmt(med, d)}</span>` });
     },
   });
 }
@@ -426,6 +427,7 @@ function render() {
                    s.q?.[def.q] === "D" ? "doubtful" : "", extra && extra.gaps ? "gappy" : ""].join(" ");
       const m = L.marker([s.lat, s.lon], {
         v, dec: def.dec, keyboard: false, riseOnHover: true,
+        zIndexOffset: SOURCES[s.src]?.official ? 1000 : 0,   // AEMET y SAIH por encima si se tocan
         icon: L.divIcon({ className: "vm-wrap", iconSize: null, html: `<span class="${cls}" style="background:${c};color:${inkFor(c)}">${fmt(v, def.dec)}</span>` }),
       });
       m.on("click", () => openStation(s.id));
@@ -442,6 +444,8 @@ function render() {
 }
 
 /* ---------- ríos y embalses */
+// aforos con caudal poco fiable que no se pintan (como en la web anterior)
+const BAD_FLOW = new Set(["A312"]);   // Bailín (Sabiñánigo)
 const RES_COLORS = [[80, "#1864ab"], [60, "#4dabf7"], [40, "#fab005"], [20, "#f08c00"], [-1, "#c92a2a"]];
 const resColor = p => (p == null ? "#8a8f98" : RES_COLORS.find(([t]) => p >= t)[1]);
 const arrow = tr => (tr === 1 ? "↑" : tr === -1 ? "↓" : tr === 0 ? "→" : "");
@@ -461,6 +465,7 @@ function renderHydro(def) {
   hydroLayer = L.layerGroup();
   if (def.hydro === "gauges") {
     for (const g of HYDRO.meta.gauges) {
+      if (BAD_FLOW.has(g.id)) continue;
       const rec = HYDRO.gauges[g.id];
       if (!rec || rec.q == null && rec.h == null) continue;
       const [lvl, c] = gaugeLevel(g, rec);
@@ -1123,7 +1128,7 @@ function openHydro(kind, id) {
 function openRanking() {
   const def = currentDef();
   let items;
-  if (def.hydro === "gauges" && HYDRO) items = HYDRO.meta.gauges.map(g => [g, HYDRO.gauges[g.id]?.q]).filter(x => x[1] != null).map(([g, v]) => ({ id: g.id, name: g.name, v, kind: "gauges" }));
+  if (def.hydro === "gauges" && HYDRO) items = HYDRO.meta.gauges.filter(g => !BAD_FLOW.has(g.id)).map(g => [g, HYDRO.gauges[g.id]?.q]).filter(x => x[1] != null).map(([g, v]) => ({ id: g.id, name: g.name, v, kind: "gauges" }));
   else if (def.hydro === "reservoirs" && HYDRO) items = HYDRO.meta.reservoirs.map(r => [r, HYDRO.reservoirs[r.id]?.pct]).filter(x => x[1] != null).map(([r, v]) => ({ id: r.id, name: r.name, v, kind: "reservoirs" }));
   else {
     const view = map.getBounds();
