@@ -66,5 +66,21 @@ const AemetHist = (() => {
     return out;
   }
 
-  return { range, index };
+  /** récords diarios de una estación con su serie completa (o null si no está en aemet-explorer) */
+  async function records(id) {
+    const f = await station(id);
+    if (!f || !f.data) return null;
+    const day = i => new Date(Date.parse(f.start + "T12:00:00Z") + i * 864e5).toISOString().slice(0, 10);
+    const best = (arr, hi, mult = 1) => {
+      let bi = -1;
+      (arr || []).forEach((v, i) => { if (v != null && (bi < 0 || (hi ? v > arr[bi] : v < arr[bi]))) bi = i; });
+      return bi < 0 ? null : [Math.round(arr[bi] * mult * 10) / 10, day(bi)];
+    };
+    const d = f.data;
+    const n = (d.tmax || []).filter(v => v != null).length;
+    return { x_hi: best(d.tmax, true), x_lo: best(d.tmax, false), n_hi: best(d.tmin, true), n_lo: best(d.tmin, false),
+             p_hi: best(d.prec, true), w_hi: best(d.racha, true, 3.6), from: f.start, n, official: true };
+  }
+
+  return { range, index, records };
 })();

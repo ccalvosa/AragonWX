@@ -880,6 +880,7 @@ function openStation(id, fly = true) {
       ${st.tzs ? `<span class="badge warn" title="El contador de lluvia de esta estación se reinicia a otra hora; la lluvia de hoy se calcula sumando incrementos">Lluvia recalculada</span>` : ""}</div>
     ${st.qc?.length ? `<div class="qc-box" id="qc-box"></div>` : ""}
     ${st.notes && !/^tag=/.test(st.notes) ? `<p class="note">${esc(st.notes.replace(/\s*tag=\S+/, ""))}</p>` : ""}
+    <div id="rec-box"></div>
     ${forecastTabsHTML(true)}
     <div class="chart-block" id="tab-obs"><div class="chart-title" id="chart-title"></div><div class="plot" id="plot-a"></div><div class="plot plot-sm" id="plot-b"></div></div>
     ${forecastBodyHTML(st.alt != null)}
@@ -894,12 +895,47 @@ function openStation(id, fly = true) {
   });
   $("#btn-hide").addEventListener("click", () => hideStation(id));
   if (st.qc?.length) showQC(id);
+  showRecords(st);
   setupForecast({ lat: st.lat, lon: st.lon, alt: st.alt, id, st });
   if (st.src === "AEMET") {
     $("#chart-title").textContent = "Cargando las últimas 24 horas…";
     ensureObs10().then(o => { if (S.sel !== id) return; const d = o?.data?.[id]; d ? plotObs10(id, d) : plotDaily(id); });
   } else plotDaily(id);
   if (typeof Editor !== "undefined" && Editor.on) Editor.stationForm(st);
+}
+
+/* ---------- récords de la estación */
+let RECS = null, RECS_TS = 0;
+async function loadRecords() {
+  if (!RECS || Date.now() - RECS_TS > 3600e3) { RECS = await getJSON(DATA_URL + "records.json" + bust()).catch(() => RECS); RECS_TS = Date.now(); }
+  return RECS;
+}
+const RECDEF = [
+  ["x_hi", "Máx. más alta", "°C", "temp", "tx", 1], ["x_lo", "Máx. más baja", "°C", "temp", "tx", -1],
+  ["n_hi", "Mín. más alta", "°C", "temp", "tn", 1], ["n_lo", "Mín. más baja", "°C", "temp", "tn", -1],
+  ["p_hi", "Lluvia en un día", "mm", "prec", "pr", 1], ["w_hi", "Racha máxima", "km/h", "wind", "gust", 1],
+];
+async function showRecords(st) {
+  const id = st.id;
+  let r = null;
+  if (st.src === "AEMET") r = await AemetHist.records(id).catch(() => null);
+  else r = (await loadRecords())?.stations?.[id];
+  const box = $("#rec-box");
+  if (!r || !box || S.sel !== id) return;
+  const dfmt = d => new Date(d + "T12:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
+  const today = st.st === "ok";
+  const tiles = RECDEF.filter(([k]) => r[k]).map(([k, label, unit, scale, live, dir]) => {
+    const [v, d] = r[k], now = today ? st[live] : null;
+    // «¡Récord hoy!» solo donde el valor del día ya no puede deshacerse: la máxima solo sube,
+    // la mínima solo baja, y lluvia y racha solo crecen (máxima más baja o mínima más alta no)
+    const beat = now != null && ["x_hi", "n_lo", "p_hi", "w_hi"].includes(k) && (dir > 0 ? now > v : now < v);
+    return `<div class="tile rec ${beat ? "beat" : ""}" style="--c:${colorFor(scale, v)}"><span class="tl">${label}</span>
+      <span class="tv num">${fmt(v, unit === "km/h" ? 0 : 1)}<small>${unit}</small></span>
+      <span class="ts">${beat ? `<b class="rec-new">¡Récord hoy! ${fmt(now, unit === "km/h" ? 0 : 1)} ${unit}</b>` : dfmt(d)}</span></div>`;
+  }).join("");
+  if (!tiles) return;
+  box.innerHTML = `<h3 class="block-title">Récords <small>desde el ${dfmt(r.from)} · ${r.n.toLocaleString("es-ES")} días${r.official ? " · serie oficial de AEMET" : " · según los datos de la estación"}</small></h3>
+    <div class="tiles rec-tiles">${tiles}</div>`;
 }
 
 /* ---------- avisos del control de calidad automático */
