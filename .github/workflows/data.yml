@@ -100,6 +100,7 @@ jobs:
             # código al día sin relanzar el bucle (los cambios del propio workflow sí necesitan relanzarlo)
             git pull -q --rebase origin "${GITHUB_REF_NAME}" || echo "::warning::no se pudo actualizar el código"
             git log -1 --format='código: %h %s'
+            pip install -q -r scraper/requirements.txt || echo "::warning::no se pudieron instalar las dependencias"
             (cd scraper && python -m aragonwx.build --out ../out --history-dir ../history) \
               || echo "::warning::la pasada ha fallado"
             [ -f out/closed_days.txt ] && { save_history || echo "::warning::no se pudo guardar el histórico"; }

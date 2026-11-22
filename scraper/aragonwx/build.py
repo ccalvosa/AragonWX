@@ -24,7 +24,6 @@ from pathlib import Path
 
 from .common import (CURRENT_MAX_AGE, OFFLINE_AFTER, ROOT, TZ, dump_json, in_aragon, iso, load_json,
                      load_stations, log, read_csv)
-from . import qc
 from .sources import aemet, avisos, dgt, pws, saih, wu
 
 FETCHERS = {
@@ -310,6 +309,7 @@ def main():
     iq = COLS.index("qc")
     qc_rows = [dict(zip(COLS, r)) for r in rows]
     try:
+        from . import qc   # aquí y no arriba: si falla (p. ej. falta numpy) no tumba la pasada
         qc_doc, qc_flags = qc.run(qc_rows, state, now, today)
     except Exception as e:
         log(f"  QC: ERROR {type(e).__name__}: {e}")
