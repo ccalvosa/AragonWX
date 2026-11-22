@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Estado del sistema</title>
-<meta name="description" content="Estado de las descargas de Estaciones de Aragón: redes, AROME, sugerencias y control de calidad.">
+<meta name="description" content="Estado de las descargas de Estaciones de Aragón: redes, AROME, radar, sugerencias y control de calidad.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3CclipPath id='c'%3E%3Crect width='32' height='32' rx='8'/%3E%3C/clipPath%3E%3Cg clip-path='url(%23c)'%3E%3Crect width='7' height='32' fill='%231c7ed6'/%3E%3Crect x='6.4' width='7' height='32' fill='%2374c0fc'/%3E%3Crect x='12.8' width='7' height='32' fill='%23ffd8a8'/%3E%3Crect x='19.2' width='7' height='32' fill='%23ff8787'/%3E%3Crect x='25.6' width='7' height='32' fill='%23e03131'/%3E%3C/g%3E%3C/svg%3E">
 <script>try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
 <link rel="manifest" href="manifest.webmanifest">
@@ -48,7 +48,7 @@
 "use strict";
 const REPO = "ccalvosa/AragonWX";
 const LOCAL = ["localhost", "127.0.0.1", ""].includes(location.hostname);
-const RAW = b => LOCAL ? { data: "out/", arome: "out/arome_pub/", discover: "out/" }[b] : `https://raw.githubusercontent.com/${REPO}/${b}/`;
+const RAW = b => LOCAL ? { data: "out/", arome: "out/arome_pub/", radar: "out/radar_pub/", discover: "out/" }[b] : `https://raw.githubusercontent.com/${REPO}/${b}/`;
 const $ = s => document.querySelector(s);
 const NAMES = { AEMET: "AEMET", SAIH: "SAIH Ebro", WU: "Weather Underground", WC: "WeatherCloud", MC: "Meteoclimatic",
   IBERICAM: "Ibericam", HOLFUY: "Holfuy", AVAMET: "AVAMET" };
@@ -77,8 +77,8 @@ function card(title, value, sub, state) {
 }
 
 (async function () {
-  const [health, now, arome, disc, qc] = await Promise.all([get(RAW("data") + "health.json"), get(RAW("data") + "now.json"),
-    get(RAW("arome") + "manifest.json"), get(RAW("discover") + "discover.json"), get(RAW("data") + "qc.json")]);
+  const [health, now, arome, disc, qc, radar] = await Promise.all([get(RAW("data") + "health.json"), get(RAW("data") + "now.json"),
+    get(RAW("arome") + "manifest.json"), get(RAW("discover") + "discover.json"), get(RAW("data") + "qc.json"), get(RAW("radar") + "manifest.json")]);
   const nowS = Date.now() / 1000;
   const dataAge = health ? nowS - health.ts : Infinity;
   const aromeAge = arome ? nowS - arome.generated : Infinity;
@@ -86,8 +86,13 @@ function card(title, value, sub, state) {
   const bad = srcs.filter(([, v]) => v.status !== "ok");
   const dataState = dataAge < 20 * 60 ? "ok" : dataAge < 40 * 60 ? "warn" : "bad";
   const aromeState = aromeAge < 6 * 3600 ? "ok" : aromeAge < 9 * 3600 ? "warn" : "bad";
+  // radar: hora de la última imagen (llegan cada 5 min con ~6 min de retraso)
+  const rLast = radar?.frames?.length ? Date.parse(radar.frames.at(-1).t) / 1000 : null;
+  const radarAge = rLast ? nowS - rLast : Infinity;
+  const radarState = radarAge < 20 * 60 ? "ok" : radarAge < 40 * 60 ? "warn" : "bad";
+  const rCount = k => radar ? radar.frames.filter(f => f.kind === k).length : 0;
 
-  const problems = (dataState !== "ok") + (aromeState !== "ok") + bad.length;
+  const problems = (dataState !== "ok") + (aromeState !== "ok") + (radarState !== "ok") + bad.length;
   $("#overall").textContent = problems ? `${problems} ${problems === 1 ? "cosa necesita" : "cosas necesitan"} atención` : "Todo funciona";
   $("#overall").className = problems ? "warn" : "ok";
   $("#overall-sub").textContent = health ? `Última pasada de las estaciones: ${when(health.ts)} (${ago(health.ts)})` : "No se puede leer el estado.";
@@ -97,6 +102,8 @@ function card(title, value, sub, state) {
     card("Datos en directo", ago(health?.ts), `${ok} estaciones con datos · cada 10 min`, dataState),
     card("AROME 1,3 km", arome ? `${new Date(arome.run).getUTCHours().toString().padStart(2, "0")} UTC` : "—",
       arome ? `pasada del ${new Date(arome.run).toLocaleDateString("es-ES", { day: "numeric", month: "short" })} · publicada ${ago(arome.generated)}` : "sin publicar", aromeState),
+    card("Radar de Zaragoza", rLast ? new Date(rLast * 1000).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : "—",
+      rLast ? `última imagen ${ago(rLast)} · ${rCount("dop")} Doppler y ${rCount("lr")} de largo alcance en ${radar.keep_h || 3} h` : "sin publicar", radarState),
     card("Control de calidad", qc ? qc.n : "—", "estaciones sospechosas por revisar en el editor", qc && qc.n ? "warn" : "ok"),
     card("Sugerencias", disc ? disc.n : "—", disc ? `estaciones nuevas · búsqueda ${ago(Date.parse(disc.generated) / 1000)}` : "sin datos",
       disc && nowS - Date.parse(disc.generated) / 1000 < 2 * 86400 ? "ok" : "warn"),
@@ -113,6 +120,7 @@ function card(title, value, sub, state) {
   $("#procs").innerHTML = [
     ["update-data", "data.yml", "Descarga de todas las redes cada 10 minutos", `última pasada ${ago(health?.ts)} · ${Object.values(t).length ? Math.max(...Object.values(t)).toFixed(0) + " s la red más lenta" : ""}`],
     ["update-arome", "arome.yml", "AROME 1,3 km de Météo-France cada 3 horas", arome ? `pasada ${arome.run.slice(0, 16).replace("T", " ")} UTC` : ""],
+    ["update-radar", "radar.yml", "Radar de Zaragoza (EUMETNET OPERA), una imagen cada 5 min", rLast ? `última imagen ${ago(rLast)}` : ""],
     ["discover-stations", "discover.yml", "Búsqueda diaria de estaciones nuevas", disc ? `${disc.n} sugerencias` : ""],
     ["watchdog", "watchdog.yml", "Vigila los bucles cada 30 min y los relanza si se paran", ""],
   ].map(([n, f, d, x]) => `<li><a href="https://github.com/${REPO}/actions/workflows/${f}" target="_blank" rel="noopener"><b>${n}</b></a>

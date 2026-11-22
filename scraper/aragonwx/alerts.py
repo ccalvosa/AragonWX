@@ -15,6 +15,7 @@ Necesita GH_TOKEN (o GITHUB_TOKEN) y GITHUB_REPOSITORY.
 """
 
 import argparse
+import datetime as dt
 import json
 import os
 import sys
@@ -88,6 +89,11 @@ def check_sources(path):
             clear_alert(s, repo, existing, key, f"Recuperada el {hhmm(now)}: {v['ok']} estaciones con datos.")
 
 
+def radar_ts(doc):
+    """Hora (epoch) de la última imagen del radar."""
+    return dt.datetime.strptime(doc["frames"][-1]["t"], "%Y-%m-%dT%H:%MZ").replace(tzinfo=dt.timezone.utc).timestamp()
+
+
 def watchdog():
     s, repo = gh()
     existing = open_alerts(s, repo)
@@ -98,10 +104,14 @@ def watchdog():
          "Los datos de las estaciones no se actualizan"),
         ("[alerta] update-arome parado", "arome.yml", f"{raw}/arome/manifest.json", "generated", 9 * 3600,
          "AROME no publica una pasada nueva"),
+        # el radar publica una imagen cada 5 min (llegan con ~6 min de retraso)
+        ("[alerta] update-radar parado", "radar.yml", f"{raw}/radar/manifest.json", radar_ts, 40 * 60,
+         "El radar de Zaragoza no publica imágenes nuevas"),
     ]
     for key, wf, url, field, max_age, what in checks:
         try:
-            ts = requests.get(url, params={"t": int(now // 60)}, timeout=30).json()[field]
+            doc = requests.get(url, params={"t": int(now // 60)}, timeout=30).json()
+            ts = field(doc) if callable(field) else doc[field]
         except Exception as e:
             log(f"  {key}: no se puede leer {url} ({e})")
             continue
@@ -112,6 +122,8 @@ def watchdog():
             raise_alert(s, repo, existing, key, what.lower(), (
                 f"{what} desde hace {age / 3600:.1f} h (último dato: {hhmm(ts)}, hora peninsular).\n\n"
                 f"El workflow **{wf}** {relaunched}. Si sigue sin funcionar, revisa su log en Actions. "
+                + ("Si el bucle funciona pero no llegan imágenes, el fallo puede estar en el bucket de "
+                   "EUMETNET OPERA (el log dirá «sin ficheros» o «no responde»). " if wf == "radar.yml" else "") +
                 f"Esta incidencia se cerrará sola cuando vuelva a publicar."))
             log(f"  {key}: {age / 60:.0f} min sin datos; relanzado ({r.status_code})")
         else:

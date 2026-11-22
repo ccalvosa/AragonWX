@@ -1,8 +1,8 @@
 name: watchdog
 
 # Cada 30 minutos comprueba que los bucles siguen vivos: si los datos de las
-# estaciones llevan más de 40 min sin actualizarse o AROME más de 9 h sin
-# publicar, relanza el workflow correspondiente y abre una incidencia
+# estaciones llevan más de 40 min sin actualizarse, AROME más de 9 h sin
+# publicar o el radar más de 40 min sin imágenes nuevas, relanza el workflow correspondiente y abre una incidencia
 # «[alerta] …» (llega por correo). La cierra sola cuando vuelve a funcionar.
 
 on:
