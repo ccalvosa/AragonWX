@@ -24,6 +24,7 @@ from pathlib import Path
 
 from .common import (CURRENT_MAX_AGE, OFFLINE_AFTER, ROOT, TZ, dump_json, in_aragon, iso, load_json,
                      load_stations, log, read_csv)
+from . import qc
 from .sources import aemet, dgt, pws, saih, wu
 
 FETCHERS = {
@@ -38,7 +39,7 @@ FETCHERS = {
 }
 
 COLS = ["id", "src", "name", "prov", "lat", "lon", "alt", "link", "q", "tzs", "model", "notes", "ar",
-        "st", "t", "ta", "tx", "tn", "pr", "p1", "p24", "gust", "wg", "ws", "hr", "pres"]
+        "st", "t", "ta", "tx", "tn", "pr", "p1", "p24", "gust", "wg", "ws", "hr", "pres", "qc"]
 QMAP = {"Contrastada": "C", "Deficiente": "D"}
 PROV = {"Huesca": "H", "Zaragoza": "Z", "Teruel": "T"}
 
@@ -143,6 +144,30 @@ def process(st, o, state, now, today):
             o["p24"] = round(sum(x[1] for x in h["inc"]), 1)
     o["st"] = "ok"
     return o
+
+
+def update_health(state, stats, results, now, ctx):
+    """Estado de cada red: ok / degradada (menos de la mitad de lo habitual) / caída (ninguna)."""
+    hs = state.setdefault("health", {})
+    out = {}
+    for src, st in stats.items():
+        if src not in results:      # red no descargada (inactiva o --only)
+            continue
+        n, ok = st.get("n", 0) - st.get("na", 0), st.get("ok", 0)
+        h = hs.setdefault(src, {"series": []})
+        h["series"] = [x for x in h["series"] if x[0] > now - 86400] + [[now, ok]]
+        past = sorted(x[1] for x in h["series"][:-1] if x[1] > 0)
+        typical = past[len(past) // 2] if past else ok
+        status = "down" if n and ok == 0 else "degraded" if typical and ok < 0.5 * typical else "ok"
+        if status != h.get("status"):
+            h["since"] = now
+        h["status"] = status
+        if status == "ok":
+            h["last_ok"] = now
+        out[src] = {"n": n, "ok": ok, "typical": typical, "status": status, "since": h.get("since"),
+                    "last_ok": h.get("last_ok"), "series": [x[1] for x in h["series"]],
+                    "t0": h["series"][0][0], "via": ctx.get(f"{src.lower()}_via")}
+    return out
 
 
 def close_day(day, snapshot, history_dir):
@@ -280,6 +305,25 @@ def main():
     for key in ("ext", "pinc", "pacc"):
         for k in [k for k in state.get(key, {}) if k not in ids]:
             del state[key][k]
+
+    # ---- control de calidad automático (sugerencias para el editor)
+    iq = COLS.index("qc")
+    qc_rows = [dict(zip(COLS, r)) for r in rows]
+    try:
+        qc_doc, qc_flags = qc.run(qc_rows, state, now, today)
+    except Exception as e:
+        log(f"  QC: ERROR {type(e).__name__}: {e}")
+        qc_doc, qc_flags = {"n": 0, "stations": {}}, {}
+    for r in rows:
+        r[iq] = qc_flags.get(r[0])
+    qc_doc["generated"] = iso(now)
+    dump_json(out / "qc.json", qc_doc)
+    log(f"  QC: {qc_doc['n']} estaciones sospechosas")
+
+    # ---- salud de cada red (para estado.html y los avisos)
+    health = update_health(state, stats, results, now, ctx)
+    dump_json(out / "health.json", {"generated": iso(now), "ts": now, "sources": health,
+                                    "timings": timings, "qc": qc_doc["n"]})
 
     now_doc = {"generated": iso(now), "ts": now, "day": today, "cols": COLS, "stats": stats,
                "timings": timings, "rows": rows}

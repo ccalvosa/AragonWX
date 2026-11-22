@@ -277,7 +277,7 @@ function renderStats() {
     <a href="https://github.com/${REPO}" target="_blank" rel="noopener">Código y datos</a> ·
     Radar <a href="https://www.rainviewer.com" target="_blank" rel="noopener">RainViewer</a> ·
     Satélite <a href="https://view.eumetsat.int" target="_blank" rel="noopener">EUMETSAT</a><br>
-    <button class="link-btn small" id="btn-editor">Editar la red</button>`;
+    <a href="estado.html">Estado del sistema</a> · <button class="link-btn small" id="btn-editor">Editar la red</button>`;
   $("#btn-editor").addEventListener("click", () => Editor.open());
 }
 
@@ -853,6 +853,7 @@ function openStation(id, fly = true) {
     ${ok ? `<div class="tiles">${tiles}</div>` : ""}
     <div class="badges">${qbadge("Máx", 0)}${qbadge("Mín", 1)}${qbadge("Lluvia", 2)}${qbadge("Viento", 3)}
       ${st.tzs ? `<span class="badge warn" title="El contador de lluvia de esta estación se reinicia a otra hora; la lluvia de hoy se calcula sumando incrementos">Lluvia recalculada</span>` : ""}</div>
+    ${st.qc?.length ? `<div class="qc-box" id="qc-box"></div>` : ""}
     ${st.notes && !/^tag=/.test(st.notes) ? `<p class="note">${esc(st.notes.replace(/\s*tag=\S+/, ""))}</p>` : ""}
     ${forecastTabsHTML(true)}
     <div class="chart-block" id="tab-obs"><div class="chart-title" id="chart-title"></div><div class="plot" id="plot-a"></div><div class="plot plot-sm" id="plot-b"></div></div>
@@ -867,12 +868,26 @@ function openStation(id, fly = true) {
     navigator.clipboard?.writeText(location.href).then(() => toast("Enlace copiado."));
   });
   $("#btn-hide").addEventListener("click", () => hideStation(id));
+  if (st.qc?.length) showQC(id);
   setupForecast({ lat: st.lat, lon: st.lon, alt: st.alt, id, st });
   if (st.src === "AEMET") {
     $("#chart-title").textContent = "Cargando las últimas 24 horas…";
     ensureObs10().then(o => { if (S.sel !== id) return; const d = o?.data?.[id]; d ? plotObs10(id, d) : plotDaily(id); });
   } else plotDaily(id);
   if (typeof Editor !== "undefined" && Editor.on) Editor.stationForm(st);
+}
+
+/* ---------- avisos del control de calidad automático */
+let QC = null, QC_TS = 0;
+async function loadQC() {
+  if (!QC || Date.now() - QC_TS > 9 * 60e3) { QC = await getJSON(DATA_URL + "qc.json" + bust()).catch(() => QC); QC_TS = Date.now(); }
+  return QC;
+}
+async function showQC(id) {
+  const q = await loadQC(), box = $("#qc-box");
+  const e = q?.stations?.[id];
+  if (!box || !e || S.sel !== id) return;
+  box.innerHTML = e.flags.map(f => `<span class="qc-flag" title="Detectado en ${f.today} pasadas hoy · ${f.days} días esta semana">⚠ ${esc(f.msg)}</span>`).join("");
 }
 
 /* ---------- previsión (Open-Meteo) */

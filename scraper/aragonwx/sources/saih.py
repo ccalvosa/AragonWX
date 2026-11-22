@@ -156,7 +156,12 @@ def from_relay():
 
 
 def fetch(stations, ctx):
-    raw = download_raw() or from_proxy() or from_relay()
+    raw, via = download_raw(), "directo"
+    if not raw:
+        raw, via = from_proxy(), "Cloudflare"
+    if not raw:
+        raw, via = from_relay(), "relé"
+    ctx["saih_via"] = via if raw else None
     if not raw:
         ctx["saih_tags"] = {}
         return {}

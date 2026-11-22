@@ -68,33 +68,76 @@ def holfuy(stations, ctx):
 
 
 # ------------------------------------------------------------------ Meteoclimatic
+MC_FEED = "https://www.meteoclimatic.net/feed/xml/{region}"
+
+
+def _mc_feed(s, region):
+    """{id: observación} de todas las estaciones de una región (p. ej. ESARA) en una petición."""
+    r = s.get(MC_FEED.format(region=region), timeout=30)
+    r.raise_for_status()
+    r.encoding = "iso-8859-15"
+    out = {}
+    for blk in re.findall(r"<station>.*?</station>", r.text, re.S):
+        g = lambda pat: (re.search(pat, blk, re.S) or [None, None])[1]
+        sid, pub = g(r"<id>([^<]+)"), g(r"<pubDate>([^<]+)")
+        if not sid or not pub:
+            continue
+        try:
+            t = int(datetime.strptime(pub.strip(), "%a, %d %b %Y %H:%M:%S %z").timestamp())
+        except ValueError:
+            continue
+        o = {"t": t,
+             "ta": num(g(r"<temperature>.*?<now>([^<]+)")), "tx": num(g(r"<temperature>.*?<max>([^<]+)")),
+             "tn": num(g(r"<temperature>.*?<min>([^<]+)")), "hr": num(g(r"<humidity>.*?<now>([^<]+)")),
+             "pres": num(g(r"<barometre>.*?<now>([^<]+)")), "ws": num(g(r"<wind>.*?<now>([^<]+)")),
+             "gust": num(g(r"<wind>.*?<max>([^<]+)")), "pr": num(g(r"<rain>.*?<total>([^<]+)"))}
+        out[sid] = {k: v for k, v in o.items() if v is not None}
+    return out
+
+
+def _mc_page(s, st):
+    """Lectura de la ficha HTML (solo para estaciones que no salen en el feed)."""
+    r = s.get(st["link"], timeout=15)
+    soup = BeautifulSoup(r.content, "html.parser")
+    tag = soup.find("td", class_="titolseccio", string=re.compile(r"actualizaci", re.I))
+    m = re.search(r"(\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2})", tag.get_text() if tag else "")
+    if not m:
+        return None
+    o = {"t": parse_utc(m.group(1), "%d-%m-%Y %H:%M")}
+    for td in soup.find_all("td", class_="dadesactuals"):
+        txt = td.get_text(" ", strip=True)
+        if "ºC" in txt and "ta" not in o:
+            o["ta"] = num(txt)
+        elif "mm" in txt:
+            o["pr"] = num(txt)
+        elif "%" in txt and "hr" not in o:
+            o["hr"] = num(txt)
+    mx, mn = soup.find("span", class_="vermell"), soup.find("span", class_="blau")
+    if mx:
+        o["tx"] = num(mx.get_text())
+    if mn:
+        o["tn"] = num(mn.get_text())
+    return o
+
+
 def meteoclimatic(stations, ctx):
+    """Feed XML regional de Meteoclimatic (una petición por región); la ficha HTML solo
+    para las estaciones que no aparezcan en él."""
     s = session()
-
-    def one(st):
-        r = s.get(st["link"], timeout=15)
-        soup = BeautifulSoup(r.content, "html.parser")
-        tag = soup.find("td", class_="titolseccio", string=re.compile(r"actualizaci", re.I))
-        m = re.search(r"(\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2})", tag.get_text() if tag else "")
-        if not m:
-            return None
-        o = {"t": parse_utc(m.group(1), "%d-%m-%Y %H:%M")}
-        for td in soup.find_all("td", class_="dadesactuals"):
-            txt = td.get_text(" ", strip=True)
-            if "ºC" in txt and "ta" not in o:
-                o["ta"] = num(txt)
-            elif "mm" in txt:
-                o["pr"] = num(txt)
-            elif "%" in txt and "hr" not in o:
-                o["hr"] = num(txt)
-        mx, mn = soup.find("span", class_="vermell"), soup.find("span", class_="blau")
-        if mx:
-            o["tx"] = num(mx.get_text())
-        if mn:
-            o["tn"] = num(mn.get_text())
-        return o
-
-    return _run("Meteoclimatic", one, stations, 10)
+    feed, regions = {}, sorted({st["id"][:5] for st in stations if st["id"].startswith("ES")})
+    for reg in regions:
+        try:
+            feed.update(_mc_feed(s, reg))
+        except Exception as e:
+            log(f"  Meteoclimatic: feed {reg} no disponible ({type(e).__name__}); se leen las fichas")
+    out = {st["id"]: feed[st["id"]] for st in stations if st["id"] in feed}
+    rest = [st for st in stations if st["id"] not in feed]
+    for st, r in pmap(lambda st: _mc_page(s, st), rest, workers=10):
+        if r:
+            out[st["id"]] = r
+    log(f"  Meteoclimatic: {len(out)}/{len(stations)} con datos ({len(stations) - len(rest)} del feed regional, "
+        f"{len(rest)} por ficha)")
+    return out
 
 
 # ------------------------------------------------------------------ Ibericam

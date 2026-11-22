@@ -181,6 +181,39 @@ Puesta en marcha del Worker (panel de Cloudflare → Workers & Pages → Create 
 El Worker solo puede tocar `config/stations.csv`. Además comprueba la cabecera, rechaza
 borrados masivos y detecta si alguien ha guardado entre medias.
 
+## Control de calidad automático (`scraper/aragonwx/qc.py`)
+
+En cada pasada se compara cada estación con sus vecinas. No oculta nada por su cuenta:
+deja sugerencias en `qc.json`, que aparecen en el editor (pestaña **Sospechosas**) y como
+aviso en la ficha de la estación.
+
+- **Temperatura actual, máxima y mínima:** diferencia con la mediana de hasta 12 vecinas a
+  menos de 20 km y con altitud parecida (|Δz| < 300 m), sin corregir por altitud. Avisa si
+  supera max(4 °C, 3·σ robusta de las vecinas); 4,5 °C en la mínima.
+- **Temperatura congelada:** el mismo valor durante más de 6 h mientras las vecinas cambian.
+- **Lluvia:**
+  - marca lluvia y ninguna vecina recoge;
+  - 0 mm con las vecinas mojadas (pluviómetro atascado);
+  - acumulados desproporcionados.
+- **Racha** muy por encima de las vecinas y **humedad** imposible (≤ 3 %).
+
+Un aviso solo se sugiere si se repite al menos 6 pasadas hoy (≈ 1 h) o en 2 días de la
+última semana. En el editor:
+- **Marcar deficiente** pone la calidad de esa variable a *Deficiente*.
+- **Descartar** añade `qc-ignore=<variable>` a las notas de la estación, para no volver a
+  avisar de esa variable.
+
+## Estado y avisos
+
+- **`estado.html`:** estado de cada red (estaciones con dato en las últimas 24 h, última vez
+  que funcionó), de AROME, de las sugerencias y del control de calidad. Enlace en el pie del
+  panel del mapa.
+- **Avisos en el bucle:** si una red lleva más de 1 h caída o con menos de la mitad de lo
+  habitual, el bucle abre una incidencia «[alerta] …». Llega por correo y se cierra sola al
+  recuperarse.
+- **`watchdog`** (cada 30 min): si los datos llevan más de 40 min sin actualizarse o AROME
+  más de 9 h sin publicar, relanza el workflow y abre una incidencia.
+
 ## Desarrollo local
 
 ```bash

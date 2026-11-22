@@ -135,12 +135,12 @@ const Editor = (() => {
       <h2 class="st-name">Estaciones</h2>
       <div class="seg seg-sm ed-tabs" id="ed-tabs">
         <button data-t="changes">Cambios${pending.length ? ` (${pending.length})` : ""}</button>
-        <button data-t="add">Alta</button><button data-t="sugg">Sugerencias</button></div>
+        <button data-t="qc">Sospechosas</button><button data-t="add">Alta</button><button data-t="sugg">Sugerencias</button></div>
       <div id="ed-body"></div>`);
     $("#ed-out").addEventListener("click", logout);
     $$("#ed-tabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === tab); b.addEventListener("click", () => { tab = b.dataset.t; render(); }); });
     if (tab !== "sugg") clearSugg();
-    ({ changes: renderChanges, add: () => renderAdd(), sugg: renderSugg })[tab]();
+    ({ changes: renderChanges, qc: renderQC, add: () => renderAdd(), sugg: renderSugg })[tab]();
   }
 
   function renderChanges() {
@@ -239,6 +239,59 @@ const Editor = (() => {
       }
     }
     return "";
+  }
+
+  /* ---------- sospechosas (control de calidad automático) ---------- */
+  const VNAME = { ta: "temperatura", tx: "máxima", tn: "mínima", pr: "lluvia", gust: "racha", hr: "humedad" };
+  function notesOf(id) {
+    const p = pending.find(x => x.id === id && x.type === "update");
+    if (p && p.fields.notes != null) return p.fields.notes;
+    return csv?.rows.find(r => r.id === id)?.notes ?? (BYID.get(id)?.notes || "");
+  }
+  function withIgnore(notes, v) {
+    const m = notes.match(/qc-ignore=([\w,]+)/);
+    const set = new Set(m ? m[1].split(",") : []);
+    set.add(v);
+    const tok = "qc-ignore=" + [...set].join(",");
+    return m ? notes.replace(m[0], tok) : (notes ? notes + " " : "") + tok;
+  }
+  async function renderQC() {
+    $("#ed-body").innerHTML = `<p class="hint">Estaciones que se apartan de sus vecinas de forma repetida (al menos 1 h hoy o
+      varios días esta semana). <b>Marcar deficiente</b> oculta esa variable en el mapa; <b>Descartar</b> deja de avisar
+      de esa variable en esta estación.</p><p class="st-status" id="eq-info">Cargando…</p><ul class="ed-sugg" id="eq-list"></ul>`;
+    let q;
+    try { q = await getJSON(DATA_URL + "qc.json" + bust()); }
+    catch { $("#eq-info").textContent = "Todavía no hay resultados del control de calidad."; return; }
+    const done = new Set(pending.map(p => p.id));
+    const score = e => Math.max(...e.flags.map(f => f.days * 100 + f.today));
+    const items = Object.entries(q.stations).filter(([id]) => !done.has(id)).sort((a, b) => score(b[1]) - score(a[1]));
+    $("#eq-info").textContent = items.length
+      ? `${items.length} estaciones sospechosas · ${new Date(q.generated).toLocaleString("es-ES", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}`
+      : "Ninguna estación sospechosa ahora mismo.";
+    $("#eq-list").innerHTML = items.map(([id, e]) => `<li data-id="${esc(id)}" class="eq-item"><div style="flex:1">
+        <span class="r-name">${esc(e.name)}</span><span class="r-meta">${NETS[e.src] || e.src} · ${esc(id)}</span>
+        ${e.flags.map((f, i) => `<div class="eq-flag"><span class="small">⚠ ${esc(f.msg)}</span>
+          <span class="r-meta">${f.today} pasadas hoy · ${f.days} ${f.days === 1 ? "día" : "días"} esta semana</span>
+          <div class="ed-btns">${f.qcol ? `<button class="btn sm" data-a="bad" data-i="${i}">Marcar ${VNAME[f.var]} deficiente</button>` : ""}
+          <button class="btn ghost sm" data-a="skip" data-i="${i}">Descartar</button></div></div>`).join("")}
+      </div><button class="btn ghost sm" data-a="see">Ver</button></li>`).join("");
+    $$("#eq-list li").forEach(li => {
+      const id = li.dataset.id, e = q.stations[id];
+      li.querySelector("[data-a=see]").addEventListener("click", () => {
+        const s = BYID.get(id);
+        if (s) { map.flyTo([s.lat, s.lon], 12); openStation(id, false); }
+      });
+      li.querySelectorAll("[data-a=bad]").forEach(b => b.addEventListener("click", () => {
+        const f = e.flags[+b.dataset.i];
+        addChange({ type: "update", id, label: `${e.name}: ${VNAME[f.var]} deficiente (control de calidad)`, fields: { [f.qcol]: "Deficiente" } });
+        renderQC();
+      }));
+      li.querySelectorAll("[data-a=skip]").forEach(b => b.addEventListener("click", () => {
+        const f = e.flags[+b.dataset.i];
+        addChange({ type: "update", id, label: `${e.name}: descartar aviso de ${VNAME[f.var]}`, fields: { notes: withIgnore(notesOf(id), f.var) } });
+        renderQC();
+      }));
+    });
   }
 
   /* ---------- sugerencias ---------- */

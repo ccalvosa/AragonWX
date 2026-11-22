@@ -1,0 +1,37 @@
+name: watchdog
+
+# Cada 30 minutos comprueba que los bucles siguen vivos: si los datos de las
+# estaciones llevan más de 40 min sin actualizarse o AROME más de 9 h sin
+# publicar, relanza el workflow correspondiente y abre una incidencia
+# «[alerta] …» (llega por correo). La cierra sola cuando vuelve a funcionar.
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: write
+  issues: write
+
+concurrency:
+  group: watchdog
+  cancel-in-progress: true
+
+jobs:
+  watchdog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+      - name: Comprobar los bucles
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: cd scraper && python -m aragonwx.alerts --watchdog
