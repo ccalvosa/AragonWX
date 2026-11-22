@@ -294,7 +294,7 @@ def main():
         s = stats.setdefault(src, {"n": 0, "ok": 0, "off": 0})
         s["n"] += 1
         s[o["st"]] = s.get(o["st"], 0) + 1
-        if o["st"] == "ok":
+        if o["st"] == "ok" and src != "AEMET":   # AEMET: su histórico oficial está en aemet-explorer
             daily = {k: o[k] for k in ("tx", "tn", "pr", "gust") if o.get(k) is not None}
             if daily:
                 snap[st["id"]] = daily

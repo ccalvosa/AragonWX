@@ -237,6 +237,7 @@ function buildControls() {
     if (q === "month") a = new Date(t.getFullYear(), t.getMonth(), 1);
     if (q === "prevmonth") { a = new Date(t.getFullYear(), t.getMonth() - 1, 1); b = new Date(t.getFullYear(), t.getMonth(), 0); }
     if (q === "year") a = new Date(t.getFullYear(), 0, 1);
+    if (q === "lastyear") { a = new Date(t.getFullYear() - 1, 0, 1); b = new Date(t.getFullYear() - 1, 11, 31); }
     const loc = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
     $("#h-start").value = loc(a); $("#h-end").value = loc(b);
     runHistory();
@@ -550,27 +551,47 @@ function monthsBetween(a, b) {
   return out;
 }
 
+function dayList(a, b) {
+  const out = [];
+  for (let t = Date.parse(a + "T12:00:00Z"); t <= Date.parse(b + "T12:00:00Z"); t += 864e5) out.push(new Date(t).toISOString().slice(0, 10));
+  return out;
+}
+
 async function runHistory() {
   const a = $("#h-start").value, b = $("#h-end").value;
   if (!a || !b || a > b) { $("#h-status").textContent = "Elige un período válido."; return; }
   const def = HVARS[S.hv];
+  const token = (runHistory.token = (runHistory.token || 0) + 1);
   $("#h-status").textContent = "Cargando…";
+  const days = dayList(a, b), pos = new Map(days.map((d, k) => [d, k])), nDays = days.length;
+  const value = (cols, k) => def.f === "m"
+    ? (cols.x?.[k] != null && cols.n?.[k] != null ? (cols.x[k] + cols.n[k]) / 2 : null)
+    : cols[def.f]?.[k] ?? null;
+  // redes de aficionados y SAIH: history/AAAA-MM.json de este repositorio
   const docs = (await Promise.all(monthsBetween(a, b).map(loadMonth))).filter(Boolean);
-  const series = new Map();   // id -> valores diarios del campo
-  let nDays = 0;
+  const series = new Map();
   for (const doc of docs) {
     doc.days.forEach((d, k) => {
-      if (d < a || d > b) return;
-      nDays++;
+      const i = pos.get(d);
+      if (i == null) return;
       for (const [id, cols] of Object.entries(doc.data)) {
-        let v;
-        if (def.f === "m") { const x = cols.x?.[k], n = cols.n?.[k]; v = x != null && n != null ? (x + n) / 2 : null; }
-        else v = cols[def.f]?.[k];
-        if (!series.has(id)) series.set(id, []);
-        series.get(id).push(v ?? null);
+        if (BYID.get(id)?.src === "AEMET") continue;   // AEMET sale de aemet-explorer
+        const v = value(cols, k);
+        if (v == null) continue;
+        if (!series.has(id)) series.set(id, new Array(nDays).fill(null));
+        series.get(id)[i] = v;
       }
     });
   }
+  // AEMET: series oficiales de aemet-explorer
+  try {
+    const ae = await AemetHist.range(days, (k, n, full) => {
+      if (full && token === runHistory.token) $("#h-status").textContent = `Cargando las series de AEMET… ${k}/${n}`;
+    });
+    for (const [id, cols] of ae) series.set(id, days.map((_, k) => value(cols, k)));
+  } catch (e) { console.warn("AEMET histórico", e); }
+  if (token !== runHistory.token) return;   // se ha pedido otro período mientras tanto
+
   const res = {};
   const allowGaps = $("#h-incomplete").checked;
   for (const [id, vals] of series) {
@@ -582,8 +603,8 @@ async function runHistory() {
     switch (def.agg) {
       case "max": v = Math.max(...ok); break;
       case "min": v = Math.min(...ok); break;
-      case "mean": v = ok.reduce((s, x) => s + x, 0) / ok.length; break;
-      case "sum": v = ok.reduce((s, x) => s + x, 0); break;
+      case "mean": v = ok.reduce((t, x) => t + x, 0) / ok.length; break;
+      case "sum": v = ok.reduce((t, x) => t + x, 0); break;
       case "count": v = ok.filter(x => x >= def.th).length; break;
       case "below": v = ok.filter(x => x < def.th).length; break;
     }
@@ -591,11 +612,10 @@ async function runHistory() {
   }
   HIST.result = res;
   HIST.range = [a, b, nDays];
-  // escala de lluvia acorde a la duración
   if (def.f === "p" && def.agg === "sum") def.scale = nDays > 100 ? "precYear" : nDays > 10 ? "precMonth" : "prec";
   const n = Object.keys(res).length;
-  $("#h-status").textContent = docs.length
-    ? `${n} estaciones · ${nDays} días${allowGaps ? "" : " (solo con ≥ 90 % de días)"}. Los datos de cada día se guardan al cerrarse la jornada.`
+  $("#h-status").textContent = n
+    ? `${n} estaciones · ${nDays} días${allowGaps ? "" : " (solo con ≥ 90 % de días)"}. AEMET: series oficiales de aemet-explorer; Wunderground desde 2024; el resto, desde que se cierra cada día aquí.`
     : "No hay histórico para ese período.";
   render();
 }
@@ -1012,11 +1032,25 @@ function openPoint(lat, lon) {
     onElevation: e => { const el = $("#pt-elev"); if (el) el.textContent = `${Math.round(e)} m`; } });
 }
 
+// Clic en el mapa: no abre el panel directamente (se dispararía sin querer al mover el mapa),
+// sino un globo con «Ver la previsión aquí». Se ignoran los clics justo después de moverlo.
+let lastMove = 0;
+map.on("movestart move moveend zoomstart zoomend", () => (lastMove = Date.now()));
 map.on("click", e => {
   if (typeof Editor !== "undefined" && Editor.pick(e.latlng)) return;
-  if (S.anim === "obs10") return;
-  openPoint(e.latlng.lat, e.latlng.lng);
-  if (innerWidth < 820) document.body.classList.remove("controls-open");
+  if (S.anim === "obs10" || Date.now() - lastMove < 400) return;
+  const { lat, lng } = e.latlng;
+  const deg = (v, p, n) => `${fmt(Math.abs(v), 2)}° ${v >= 0 ? p : n}`;
+  L.popup({ className: "pt-pop", closeButton: true, autoPan: false, offset: [0, -2] })
+    .setLatLng(e.latlng)
+    .setContent(`<div class="pt-pop-body"><span class="muted small">${deg(lat, "N", "S")} · ${deg(lng, "E", "O")}</span>
+      <button class="btn sm" id="pt-go">Ver la previsión aquí</button></div>`)
+    .openOn(map);
+  $("#pt-go").addEventListener("click", () => {
+    map.closePopup();
+    openPoint(lat, lng);
+    if (innerWidth < 820) document.body.classList.remove("controls-open");
+  });
 });
 
 /* ---------- gráficos (Plotly bajo demanda) */
@@ -1072,11 +1106,17 @@ async function plotObs10(id, d) {
 async function plotDaily(id) {
   const now = new Date(), mons = [];
   for (let k = 1; k >= 0; k--) { const d = new Date(now.getFullYear(), now.getMonth() - k, 1); mons.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }
-  const docs = (await Promise.all(mons.map(loadMonth))).filter(Boolean);
   const days = [], x = [], n = [], p = [];
-  for (const doc of docs) {
-    const c = doc.data[id]; if (!c) continue;
-    doc.days.forEach((d, k) => { days.push(d); x.push(c.x?.[k] ?? null); n.push(c.n?.[k] ?? null); p.push(c.p?.[k] ?? null); });
+  if (BYID.get(id)?.src === "AEMET") {   // AEMET: de aemet-explorer
+    const dl = dayList(new Date(Date.now() - 45 * 864e5).toISOString().slice(0, 10), new Date(Date.now() - 864e5).toISOString().slice(0, 10));
+    const c = (await AemetHist.range(dl).catch(() => new Map())).get(id);
+    if (c) dl.forEach((d, k) => { days.push(d); x.push(c.x[k]); n.push(c.n[k]); p.push(c.p[k]); });
+  } else {
+    const docs = (await Promise.all(mons.map(loadMonth))).filter(Boolean);
+    for (const doc of docs) {
+      const c = doc.data[id]; if (!c) continue;
+      doc.days.forEach((d, k) => { days.push(d); x.push(c.x?.[k] ?? null); n.push(c.n?.[k] ?? null); p.push(c.p?.[k] ?? null); });
+    }
   }
   const s = BYID.get(id);
   const today = NOW?.day;

@@ -188,6 +188,20 @@ Puesta en marcha del Worker (panel de Cloudflare → Workers & Pages → Create 
 El Worker solo puede tocar `config/stations.csv`. Además comprueba la cabecera, rechaza
 borrados masivos y detecta si alguien ha guardado entre medias.
 
+## Histórico diario
+
+- **AEMET:** no se guarda aquí. La web lee las series oficiales de
+  [aemet-explorer](https://ccalvosa.github.io/aemet-explorer/) (`js/aemethist.js`):
+  - `recent.json` para los últimos ~120 días;
+  - `daily.json` (rama `obs`) para los provisionales de los últimos días;
+  - para periodos más antiguos, la serie completa de cada estación de Aragón, que solo se
+    descarga entonces.
+- **Wunderground:** rellenado desde enero de 2024 con `scripts/backfill_wu.py` (resúmenes
+  diarios de la API de WU) y, desde entonces, con el cierre de cada día.
+- **SAIH, WeatherCloud, Meteoclimatic, Ibericam, Holfuy y AVAMET:** no tienen histórico
+  público. Se acumula desde que el bucle cierra cada día (máxima, mínima, lluvia y racha) en
+  `history/AAAA-MM.json`.
+
 ## Control de calidad automático (`scraper/aragonwx/qc.py`)
 
 En cada pasada se compara cada estación con sus vecinas. No oculta nada por su cuenta:
