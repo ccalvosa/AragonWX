@@ -53,10 +53,6 @@ jobs:
               git show FETCH_HEAD:$f > out/$f 2>/dev/null || rm -f out/$f
             done
           fi
-          # pasada de AROME ya publicada (para no repetirla)
-          if git fetch --depth=1 origin arome 2>/dev/null; then
-            git show FETCH_HEAD:manifest.json 2>/dev/null | python -c "import json,sys; print(json.load(sys.stdin)['run'])" > out/arome_run.txt || true
-          fi
           ls -la out
 
       - name: Bucle de descarga y publicación
@@ -81,17 +77,6 @@ jobs:
               git commit -q -m "data: $(date -u +%FT%TZ) [bot]"
               git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data
             )
-          }
-          publish_arome() {
-            rm -rf pubar && cp -r out/arome_pub pubar
-            (
-              cd pubar
-              git init -q
-              git checkout -q -b arome
-              git add .
-              git commit -q -m "arome: pasada $(python -c "import json; print(json.load(open('manifest.json'))['run'])") [bot]"
-              git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" arome
-            ) && python -c "import json; print(json.load(open('out/arome_pub/manifest.json'))['run'])" > out/arome_run.txt
           }
           save_history() {
             # el día anterior se ha cerrado: commit normal en main con history/
@@ -118,10 +103,6 @@ jobs:
               || echo "::warning::la pasada ha fallado"
             [ -f out/closed_days.txt ] && { save_history || echo "::warning::no se pudo guardar el histórico"; }
             [ -f out/now.json ] && { publish || echo "::warning::no se pudo publicar"; }
-            # AROME 1,3 km: se procesa por partes (máx. 4 min por vuelta) y se publica al completar la pasada
-            (cd scraper && python -m aragonwx.arome --stage ../out/arome_stage --publish ../out/arome_pub \
-                --published-run "$(cat ../out/arome_run.txt 2>/dev/null)" --budget 240) || echo "::warning::AROME ha fallado"
-            [ -f out/arome_ready ] && { publish_arome && rm -f out/arome_ready || echo "::warning::no se pudo publicar AROME"; }
             echo "::endgroup::"
             now=$(date +%s)
             [ $(( now + EVERY )) -lt $end ] || break

@@ -93,8 +93,8 @@ No se usa Selenium: una pasada completa tarda unos 20 segundos.
    Opcional: `WU_API_KEY`.
 2. **Actions** (Settings → Actions → General → Workflow permissions): *Read and write*.
 3. **Pages** (Settings → Pages): *Deploy from a branch* → `main` / `/ (root)`.
-4. Lanzar el workflow una vez a mano (Actions → update-data → Run workflow). A partir
-   de ahí se relanza solo.
+4. Lanzar los dos workflows una vez a mano (Actions → update-data y update-arome →
+   Run workflow). A partir de ahí se relanzan solos.
 5. **Dominio propio** (opcional): en Settings → Pages → Custom domain, poner
    `estacioneszgz.meteozgz.eu`. En el DNS de meteozgz.eu, crear un `CNAME` de
    `estacioneszgz` a `ccalvosa.github.io`.
@@ -108,9 +108,10 @@ y luego solo se bajan la temperatura, la racha y las tres precipitaciones acumul
 Mercator y se guardan como PNG de 8 bits con el valor codificado. La web los colorea con
 las mismas escalas que las estaciones.
 
-Cada vuelta del bucle dedica como mucho 4 minutos a AROME. La última pasada completa
-(cada 3 h, H+00 a H+51) se procesa en 2 o 3 vueltas y se publica en la rama `arome`
-(~7 MB).
+Va en su propio workflow, `.github/workflows/arome.yml` (**update-arome**), separado de
+las estaciones: un bucle que cada 10 min mira si hay una pasada nueva completa (cada 3 h,
+H+00 a H+51), la procesa (unos 3 min, con un máximo de 8 por vuelta) y la publica en la
+rama `arome` (~7 MB). Dependencias en `scraper/requirements-arome.txt`.
 
 ## SAIH desde GitHub Actions
 
