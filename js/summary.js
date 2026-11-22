@@ -1,6 +1,6 @@
 /* ==========================================================
    Resumen del día en Aragón: extremos, ríos, embalses y avisos,
-   con descarga como imagen (1080×1350) para redes sociales.
+   con descarga como imagen (1080×1920) para redes sociales.
    Excluye estaciones con calidad «Deficiente», ocultas a mano o
    marcadas por el control de calidad en esa variable.
    ========================================================== */
@@ -8,11 +8,15 @@
 const Summary = (() => {
   let official = false;
   const CATS = [
-    { k: "tx", title: "Máxima más alta", unit: "°C", scale: "temp", dir: -1, dec: 1, q: 0 },
-    { k: "tn", title: "Mínima más baja", unit: "°C", scale: "temp", dir: 1, dec: 1, q: 1 },
-    { k: "pr", title: "Más lluvia hoy", unit: "mm", scale: "prec", dir: -1, dec: 1, q: 2, min: 0.1 },
-    { k: "gust", title: "Racha más fuerte", unit: "km/h", scale: "wind", dir: -1, dec: 0, q: 3 },
+    { id: "txh", k: "tx", title: "Máxima más alta", unit: "°C", scale: "temp", dir: -1, dec: 1, q: 0 },
+    { id: "txl", k: "tx", title: "Máxima más baja", unit: "°C", scale: "temp", dir: 1, dec: 1, q: 0 },
+    { id: "tnh", k: "tn", title: "Mínima más alta", unit: "°C", scale: "temp", dir: -1, dec: 1, q: 1 },
+    { id: "tnl", k: "tn", title: "Mínima más baja", unit: "°C", scale: "temp", dir: 1, dec: 1, q: 1 },
+    { id: "pr", k: "pr", title: "Más lluvia hoy", unit: "mm", scale: "prec", dir: -1, dec: 1, q: 2, min: 0.1 },
+    { id: "gust", k: "gust", title: "Racha más fuerte", unit: "km/h", scale: "wind", dir: -1, dec: 0, q: 3 },
   ];
+  // orden en la imagen (3 filas × 2): los extremos de titular arriba
+  const IMG_ORDER = ["txh", "tnl", "txl", "tnh", "pr", "gust"];
   const NOWCATS = [
     { k: "ta", title: "Ahora, la más cálida", unit: "°C", scale: "temp", dir: -1, dec: 1, q: 0 },
     { k: "ta", title: "Ahora, la más fría", unit: "°C", scale: "temp", dir: 1, dec: 1, q: 0 },
@@ -21,7 +25,7 @@ const Summary = (() => {
   function pool() {
     return STATIONS.filter(s => s.st === "ok" && !S.hidden.has(s.id) && inAragon(s) && (!official || SOURCES[s.src]?.official));
   }
-  function top(c, n = 5) {
+  function top(c, n = 10) {
     return pool().filter(s => s[c.k] != null && (c.min == null || s[c.k] >= c.min)
         && !(s.q && s.q[c.q] === "D") && !(s.qc || []).some(code => code.startsWith(c.k + "_")))
       .sort((a, b) => (a[c.k] - b[c.k]) * c.dir).slice(0, n);
@@ -90,15 +94,17 @@ const Summary = (() => {
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   }
 
-  /* ---------- imagen 1080×1350 ---------- */
+  /* ---------- imagen 1080×1920 ---------- */
   async function image() {
     await document.fonts?.ready;
-    const W = 1080, H = 1350, P = 60, cv = document.createElement("canvas");
+    // 1080×1920 (9:16): seis categorías con su top 10, más ríos, embalses y avisos
+    const W = 1080, H = 1920, P = 56, cv = document.createElement("canvas");
     cv.width = W; cv.height = H;
     const x = cv.getContext("2d"), c = n => cssVar(n), F = (w, s) => `${w} ${s}px "Plus Jakarta Sans", system-ui, sans-serif`;
     const round = (X, Y, w, h, r, fill, stroke) => { x.beginPath(); x.roundRect(X, Y, w, h, r); if (fill) { x.fillStyle = fill; x.fill(); } if (stroke) { x.strokeStyle = stroke; x.lineWidth = 2; x.stroke(); } };
     const text = (t, X, Y, font, color, align = "left", maxW) => {
       x.font = font; x.fillStyle = color; x.textAlign = align; x.textBaseline = "alphabetic";
+      t = String(t);
       if (maxW) while (x.measureText(t).width > maxW && t.length > 3) t = t.slice(0, -2) + "…";
       x.fillText(t, X, Y);
     };
@@ -106,47 +112,50 @@ const Summary = (() => {
     // cabecera
     ["#1c7ed6", "#74c0fc", "#ffd8a8", "#ff8787", "#e03131"].forEach((col, i) => { x.fillStyle = col; x.fillRect(P + i * 11, P, 12, 56); });
     text("ESTACIONES DE ARAGÓN", P + 76, P + 22, F(700, 20), c("--accent"));
-    text("Resumen del día", P + 76, P + 58, F(800, 40), c("--fg"));
+    text("Resumen del día", P + 76, P + 58, F(800, 42), c("--fg"));
     text(dateLong().replace(/^./, m => m.toUpperCase()), P, P + 112, F(600, 26), c("--muted"));
     text(`Datos hasta las ${hhmm(NOW_TS())}${official ? " · solo AEMET y SAIH" : ""}`, W - P, P + 112, F(500, 22), c("--muted"), "right");
-    // cuatro bloques
-    const gw = (W - 2 * P - 24) / 2, gh = 400, y0 = P + 145;
-    CATS.forEach((cat, i) => {
-      const X = P + (i % 2) * (gw + 24), Y = y0 + Math.floor(i / 2) * (gh + 24);
+    // seis bloques en 3×2, en el orden de IMG_ORDER
+    const gap = 20, gw = (W - 2 * P - gap) / 2, gh = 466, y0 = P + 150;
+    IMG_ORDER.forEach((k, i) => {
+      const cat = CATS.find(cc => cc.id === k);
+      const X = P + (i % 2) * (gw + gap), Y = y0 + Math.floor(i / 2) * (gh + gap);
       round(X, Y, gw, gh, 22, c("--card"), c("--border"));
-      const t = top(cat, 4);
-      text(cat.title.toUpperCase(), X + 28, Y + 46, F(700, 20), c("--muted"));
-      if (!t.length) { text("Sin datos", X + 28, Y + 120, F(700, 36), c("--muted")); return; }
-      const s0 = t[0], col = colorFor(cat.scale, s0[cat.k]);
-      round(X + 28, Y + 66, gw - 56, 104, 16, col);
-      text(`${fmt(s0[cat.k], cat.dec)}`, X + 50, Y + 146, F(800, 64), inkFor(col));
-      x.font = F(800, 64);
-      text(cat.unit, X + 58 + x.measureText(fmt(s0[cat.k], cat.dec)).width, Y + 146, F(700, 28), inkFor(col));
-      text(s0.name, X + 28, Y + 210, F(700, 28), c("--fg"), "left", gw - 56);
-      text(`${SOURCES[s0.src]?.name || s0.src}${s0.alt != null ? ` · ${s0.alt} m` : ""}`, X + 28, Y + 242, F(500, 20), c("--muted"), "left", gw - 56);
+      const t = top(cat, 10);
+      text(cat.title.toUpperCase(), X + 26, Y + 40, F(700, 18), c("--muted"));
+      if (!t.length) { text("Sin datos", X + 26, Y + 120, F(700, 34), c("--muted")); return; }
+      const s0 = t[0], col = colorFor(cat.scale, s0[cat.k]), val = fmt(s0[cat.k], cat.dec);
+      round(X + 26, Y + 56, gw - 52, 84, 16, col, inkFor(col) === "#111" && /^#(F|E)/i.test(col) ? c("--border") : null);
+      text(val, X + 46, Y + 118, F(800, 54), inkFor(col));
+      x.font = F(800, 54);
+      text(cat.unit, X + 54 + x.measureText(val).width, Y + 118, F(700, 24), inkFor(col));
+      text(s0.name, X + 26, Y + 176, F(700, 26), c("--fg"), "left", gw - 52);
+      text(`${SOURCES[s0.src]?.name || s0.src}${s0.alt != null ? ` · ${s0.alt} m` : ""}`, X + 26, Y + 204, F(500, 18), c("--muted"), "left", gw - 52);
       t.slice(1).forEach((s, j) => {
-        const yy = Y + 300 + j * 34;
-        text(`${j + 2}. ${s.name}`, X + 28, yy, F(600, 22), c("--fg"), "left", gw - 160);
-        text(`${fmt(s[cat.k], cat.dec)} ${cat.unit}`, X + gw - 28, yy, F(700, 22), c("--fg"), "right");
+        const yy = Y + 242 + j * 25;
+        text(`${j + 2}.`, X + 26, yy, F(600, 19), c("--muted"));
+        text(s.name, X + 56, yy, F(600, 19), c("--fg"), "left", gw - 190);
+        text(`${fmt(s[cat.k], cat.dec)} ${cat.unit}`, X + gw - 26, yy, F(700, 19), c("--fg"), "right");
       });
     });
     // fila inferior: ríos, embalses y avisos
-    const Y2 = y0 + 2 * gh + 48, w3 = (W - 2 * P - 48) / 3, h3 = 150;
+    const Y2 = y0 + 3 * gh + 3 * gap, w3 = (W - 2 * P - 2 * gap) / 3, h3 = 124;
     const rv = rivers(), em = reservoirs(), av = typeof Avisos !== "undefined" ? Avisos.aragon() : [];
+    const nz = new Set(av.map(a => a.zone)).size;
     const tiles = [
       ["RÍOS EN AVISO", rv.length ? String(rv.length) : "Ninguno", rv.length ? rv.slice(0, 2).map(([g]) => g.name).join(", ") : "todos los aforos bajo umbral"],
       ["EMBALSES", em ? `${fmt(em.pct, 0)} %` : "—", em ? `${em.dv >= 0 ? "+" : ""}${fmt(em.dv, 1)} hm³ en 24 h` : ""],
-      ["AVISOS AEMET", av.length ? (n => `${n} ${n === 1 ? "zona" : "zonas"}`)(new Set(av.map(a => a.zone)).size) : "Ninguno", av.length ? [...new Set(av.map(a => a.phen_name))].join(", ") : "sin avisos en Aragón"],
+      ["AVISOS AEMET", nz ? `${nz} ${nz === 1 ? "zona" : "zonas"}` : "Ninguno", nz ? [...new Set(av.map(a => a.phen_name))].join(", ") : "sin avisos en Aragón"],
     ];
     tiles.forEach(([t, v, sub], i) => {
-      const X = P + i * (w3 + 24);
+      const X = P + i * (w3 + gap);
       round(X, Y2, w3, h3, 20, c("--card"), c("--border"));
-      text(t, X + 24, Y2 + 40, F(700, 18), c("--muted"));
-      text(v, X + 24, Y2 + 92, F(800, 40), c("--fg"), "left", w3 - 48);
-      text(sub, X + 24, Y2 + 126, F(500, 18), c("--muted"), "left", w3 - 48);
+      text(t, X + 22, Y2 + 36, F(700, 17), c("--muted"));
+      text(v, X + 22, Y2 + 84, F(800, 36), c("--fg"), "left", w3 - 44);
+      text(sub, X + 22, Y2 + 108, F(500, 17), c("--muted"), "left", w3 - 44);
     });
     // pie
-    text("Datos: AEMET · SAIH Ebro · Weather Underground · WeatherCloud · Meteoclimatic · Ibericam · Holfuy · AVAMET", P, H - P - 26, F(500, 17), c("--muted"), "left", W - 2 * P);
+    text("Datos: AEMET · SAIH Ebro · Weather Underground · WeatherCloud · Meteoclimatic · Ibericam · Holfuy · AVAMET", P, H - P - 20, F(500, 17), c("--muted"), "left", W - 2 * P);
     text("ccalvosa.github.io/AragonWX", P, H - P + 8, F(700, 24), c("--accent"));
     return new Promise(res => cv.toBlob(res, "image/png"));
   }
