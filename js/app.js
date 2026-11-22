@@ -630,10 +630,11 @@ function drawInterp() {
   const kind = def.scale === "temp" ? "temp" : def.scale?.startsWith("prec") ? "prec" : def.scale === "wind" ? "wind" : def.scale === "hum" ? "hum" : "days";
   setTimeout(() => {
     const t0 = performance.now();
-    const out = Interp.surface(pts, RINGS, { scale: def.scale, kind });
-    if (!out) return toast("No hay estaciones suficientes para interpolar.");
-    interpLayer = L.imageOverlay(out.url, out.bounds, { pane: "interp", opacity: 0.62, interactive: false, className: "interp-img" }).addTo(map);
-    console.info(`krigeado: ${out.n} puntos en ${Math.round(performance.now() - t0)} ms`);
+    const mod = Interp.fit(pts, { scale: def.scale, kind });
+    if (!mod) return toast("No hay estaciones suficientes para interpolar.");
+    interpLayer && map.removeLayer(interpLayer);
+    interpLayer = new Interp.Layer(mod, RINGS, { opacity: 0.62 }).addTo(map);
+    console.info(`krigeado: ${mod.n} puntos en ${Math.round(performance.now() - t0)} ms`);
   }, 30);
 }
 

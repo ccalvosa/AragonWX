@@ -88,37 +88,26 @@ const Interp = (() => {
     const b = pts.map(p => p.v); b.push(0);
     const sol = solve(A.map(r => Array.from(r)), b);
     if (!sol) return null;
-    return { xy, a: sol.slice(0, n), mu: sol[n], cov };
+    const a = sol.slice(0, n);
+    // forma rápida para predecir: coordenadas planas y pesos ya multiplicados por la covarianza
+    const X = Float64Array.from(xy, p => p[0]), Y = Float64Array.from(xy, p => p[1]);
+    const Wc = Float64Array.from(a, v => v * (sill - nug)), W0 = Float64Array.from(a, v => v * sill);
+    return { xy, a, mu: sol[n], cov, X, Y, Wc, W0, k: -3 / rangeKm };
   }
 
   function predict(m, lat, lon) {
-    const [x, y] = proj(lat, lon);
+    const x = lon * KX, y = lat * KY, { X, Y, Wc, W0, k } = m, n = X.length;
     let s = m.mu;
-    for (let i = 0; i < m.a.length; i++) s += m.a[i] * m.cov(Math.hypot(x - m.xy[i][0], y - m.xy[i][1]));
+    for (let i = 0; i < n; i++) {
+      const dx = x - X[i], dy = y - Y[i], d2 = dx * dx + dy * dy;
+      s += d2 === 0 ? W0[i] : Wc[i] * Math.exp(k * Math.sqrt(d2));
+    }
     return s;
   }
 
-  function insidePoly(rings, lat, lon) {
-    let inside = false;
-    for (const ring of rings) {
-      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-        const [xi, yi] = ring[i], [xj, yj] = ring[j];
-        if ((yi > lat) !== (yj > lat) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi) inside = !inside;
-      }
-    }
-    return inside;
-  }
 
-  const maskCache = new Map();
-  const mercY = lat => Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360));
-  const invMercY = y => (2 * Math.atan(Math.exp(y)) - Math.PI / 2) * 180 / Math.PI;
-
-  /**
-   * points: [{lat, lon, v}] · rings: anillos exteriores [[lon,lat],…] para recortar
-   * opts: {scale, kind: "temp"|"prec"|"wind"|..., bbox:[[s,w],[n,e]], step}
-   * Devuelve {url, bounds, n} o null.
-   */
-  function surface(points, rings, opts) {
+  /** Ajusta el modelo a las estaciones. Devuelve {m, n, kind, scale} o null si hay pocas. */
+  function fit(points, opts) {
     const kind = opts.kind || "temp";
     let pts = decluster(points.filter(p => Number.isFinite(p.v)), opts.cell || 0.07);
     if (kind === "temp") pts = despike(pts, 25, 6);
@@ -129,45 +118,104 @@ const Interp = (() => {
       pts = pts.slice(0, 420);
     }
     const m = train(pts, opts.rangeKm || (kind === "prec" ? 35 : 60), opts.nugget ?? 0.08);
-    if (!m) return null;
-    const [[S, W], [N, E]] = opts.bbox || [[39.84, -2.18], [42.94, 0.78]];
-    const step = opts.step || 0.015;
-    const cols = Math.round((E - W) / step), y0 = mercY(S), y1 = mercY(N);
-    const rows = Math.round((y1 - y0) / (step * Math.PI / 180));
-    const cv = document.createElement("canvas");
-    cv.width = cols; cv.height = rows;
-    const ctx = cv.getContext("2d"), img = ctx.createImageData(cols, rows);
-    const mkey = `${cols}x${rows}:${S},${W},${N},${E}`;
-    if (!maskCache.has(mkey)) {
-      const mask = new Uint8Array(cols * rows);
-      for (let r = 0; r < rows; r++) {
-        const lat = invMercY(y1 - (r + 0.5) * (y1 - y0) / rows);
-        for (let c = 0; c < cols; c++) mask[r * cols + c] = !rings || insidePoly(rings, lat, W + (c + 0.5) * step) ? 1 : 0;
-      }
-      maskCache.set(mkey, mask);
-    }
-    const mask = maskCache.get(mkey);
-    const cache = new Map();
-    const rgb = c => {
-      if (!cache.has(c)) { const h = c.slice(1); cache.set(c, [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]); }
-      return cache.get(c);
-    };
-    for (let r = 0; r < rows; r++) {
-      const lat = invMercY(y1 - (r + 0.5) * (y1 - y0) / rows);
-      for (let c = 0; c < cols; c++) {
-        const lon = W + (c + 0.5) * step;
-        if (!mask[r * cols + c]) continue;
-        let v = predict(m, lat, lon);
-        if (kind === "prec" || kind === "wind" || kind === "hum") v = Math.max(0, v);
-        if (kind === "prec" && v < 0.1) continue;
-        const [R, G, B] = rgb(colorFor(opts.scale, v));
-        const k = (r * cols + c) * 4;
-        img.data[k] = R; img.data[k + 1] = G; img.data[k + 2] = B; img.data[k + 3] = 255;
-      }
-    }
-    ctx.putImageData(img, 0, 0);
-    return { url: cv.toDataURL("image/png"), bounds: [[S, W], [N, E]], n: pts.length };
+    return m ? { m, n: pts.length, kind, scale: opts.scale } : null;
   }
 
-  return { surface };
+  /* Capa que evalúa el krigeado sobre la zona visible en cada zoom o desplazamiento:
+     rejilla de pantalla de unos 22 000 nodos como máximo (≥ 6 px; el campo es suave), interpolación bilineal del valor hasta cada
+     píxel, color por tramos y recorte exacto con el contorno de Aragón. */
+  const MAXNODES = 22000;
+  const Layer = L.Layer.extend({
+    initialize(model, rings, opts = {}) { this._mod = model; this._rings = rings; this._opacity = opts.opacity ?? 0.62; },
+    onAdd(map) {
+      this._map = map;
+      this._cv = L.DomUtil.create("canvas", "interp-canvas leaflet-zoom-hide");
+      this._cv.style.opacity = this._opacity;
+      map.getPane("interp").appendChild(this._cv);
+      map.on("moveend zoomend resize viewreset", this._draw, this);
+      map.on("zoomstart", this._hide, this);
+      this._draw();
+    },
+    onRemove(map) {
+      map.off("moveend zoomend resize viewreset", this._draw, this);
+      map.off("zoomstart", this._hide, this);
+      this._cv.remove();
+    },
+    _hide() { this._cv.style.visibility = "hidden"; },
+    _draw() {
+      const map = this._map, cv = this._cv, { m, kind, scale } = this._mod;
+      const size = map.getSize(), pad = 0.15;
+      const px = Math.round(size.x * pad), py = Math.round(size.y * pad);
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const W = size.x + 2 * px, H = size.y + 2 * py, cw = Math.round(W * dpr), ch = Math.round(H * dpr);
+      cv.width = cw; cv.height = ch; cv.style.width = W + "px"; cv.style.height = H + "px";
+      const origin = map.containerPointToLayerPoint([-px, -py]);
+      L.DomUtil.setPosition(cv, origin);
+      // rejilla gruesa (en píxeles de pantalla) sobre la vista ∩ Aragón
+      const [[S0, W0], [N0, E0]] = [[39.84, -2.18], [42.94, 0.78]];
+      const p0 = map.latLngToContainerPoint([N0, W0]), p1 = map.latLngToContainerPoint([S0, E0]);
+      const gx0 = Math.max(-px, Math.floor(p0.x)), gy0 = Math.max(-py, Math.floor(p0.y));
+      const gx1 = Math.min(size.x + px, Math.ceil(p1.x)), gy1 = Math.min(size.y + py, Math.ceil(p1.y));
+      const ctx = cv.getContext("2d");
+      if (gx1 <= gx0 || gy1 <= gy0) { cv.style.visibility = "visible"; return; }
+      const CELL = Math.max(6, Math.ceil(Math.sqrt((gx1 - gx0) * (gy1 - gy0) / MAXNODES)));
+      const nx = Math.ceil((gx1 - gx0) / CELL) + 1, ny = Math.ceil((gy1 - gy0) / CELL) + 1;
+      const G = new Float32Array(nx * ny);
+      let vmin = Infinity, vmax = -Infinity;
+      for (let j = 0; j < ny; j++) {
+        const lat = map.containerPointToLatLng([gx0, gy0 + j * CELL]).lat;
+        for (let i = 0; i < nx; i++) {
+          const lon = map.containerPointToLatLng([gx0 + i * CELL, gy0 + j * CELL]).lng;
+          let v = predict(m, lat, lon);
+          if (kind === "prec" || kind === "wind" || kind === "hum") v = Math.max(0, v);
+          G[j * nx + i] = v;
+          if (v < vmin) vmin = v;
+          if (v > vmax) vmax = v;
+        }
+      }
+      // tabla de color por valor (por tramos, como la leyenda)
+      const NL = 2048, span = Math.max(vmax - vmin, 1e-6), lut = new Uint8ClampedArray(NL * 4);
+      for (let k = 0; k < NL; k++) {
+        const v = vmin + span * k / (NL - 1);
+        if (kind === "prec" && v < 0.1) continue;
+        const h = colorFor(scale, v);
+        lut[k * 4] = parseInt(h.slice(1, 3), 16); lut[k * 4 + 1] = parseInt(h.slice(3, 5), 16);
+        lut[k * 4 + 2] = parseInt(h.slice(5, 7), 16); lut[k * 4 + 3] = 255;
+      }
+      const img = ctx.createImageData(cw, ch), out = img.data;
+      const X0 = (gx0 + px) * dpr, Y0 = (gy0 + py) * dpr, X1 = (gx1 + px) * dpr, Y1 = (gy1 + py) * dpr, cell = CELL * dpr;
+      for (let y = Math.max(0, Math.floor(Y0)); y < Math.min(ch, Math.ceil(Y1)); y++) {
+        const fy = (y + 0.5 - Y0) / cell, j0 = Math.min(ny - 2, Math.max(0, Math.floor(fy))), ty = Math.min(1, Math.max(0, fy - j0));
+        let o = (y * cw + Math.max(0, Math.floor(X0))) * 4;
+        for (let x = Math.max(0, Math.floor(X0)); x < Math.min(cw, Math.ceil(X1)); x++, o += 4) {
+          const fx = (x + 0.5 - X0) / cell, i0 = Math.min(nx - 2, Math.max(0, Math.floor(fx))), tx = Math.min(1, Math.max(0, fx - i0));
+          const a = G[j0 * nx + i0], b = G[j0 * nx + i0 + 1], c = G[(j0 + 1) * nx + i0], d = G[(j0 + 1) * nx + i0 + 1];
+          const v = (a + (b - a) * tx) * (1 - ty) + (c + (d - c) * tx) * ty;
+          const k = Math.round((v - vmin) / span * (NL - 1)) * 4;
+          if (!lut[k + 3]) continue;
+          out[o] = lut[k]; out[o + 1] = lut[k + 1]; out[o + 2] = lut[k + 2]; out[o + 3] = 255;
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+      // recorte exacto con el contorno de Aragón (en coordenadas de pantalla)
+      if (this._rings) {
+        ctx.globalCompositeOperation = "destination-in";
+        ctx.beginPath();
+        for (const ring of this._rings) {
+          ring.forEach(([lo, la], k) => {
+            const p = map.latLngToContainerPoint([la, lo]);
+            const X = (p.x + px) * dpr, Y = (p.y + py) * dpr;
+            k ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y);
+          });
+          ctx.closePath();
+        }
+        ctx.fillStyle = "#000";
+        ctx.fill();
+        ctx.globalCompositeOperation = "source-over";
+      }
+      cv.style.visibility = "visible";
+    },
+  });
+
+  return { fit, Layer };
 })();

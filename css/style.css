@@ -337,6 +337,7 @@ body.side-open .map-tools { right: 404px; }
 .btn-link { font-weight: 600; }
 
 .interp-img { image-rendering: auto; }
+.interp-canvas { position: absolute; left: 0; top: 0; pointer-events: none; }
 .hs-dark { filter: invert(1); mix-blend-mode: screen; }
 
 /* Leaflet al tema */
