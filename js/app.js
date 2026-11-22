@@ -25,7 +25,7 @@ const norm = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLow
 const PREF_KEY = "aragonwx-prefs";
 const S = {
   mode: "now", v: "ta", hv: "x_max", filter: "all", official: false, doubtful: false, cluster: true,
-  netsOff: new Set(), base: "auto", layers: { prov: true }, sat: "ir",
+  netsOff: new Set(), base: "auto", layers: { prov: true, avisos: true }, sat: "ir",
   sel: null, side: null, anim: null, ftab: "obs", wide: false, aemetAr: false,
   hidden: new Set(),   // estaciones ocultadas con Supr (solo en este navegador)
 };
@@ -41,7 +41,7 @@ function savePrefs() {
   try {
     localStorage.setItem(PREF_KEY, JSON.stringify({
       v: S.v, hv: S.hv, filter: S.filter, official: S.official, doubtful: S.doubtful, cluster: S.cluster,
-      netsOff: [...S.netsOff], base: S.base, ftab: S.ftab, wide: S.wide, aemetAr: S.aemetAr, hidden: [...S.hidden], layers: { prov: S.layers.prov, cams: S.layers.cams, manual: S.layers.manual }, sat: S.sat,
+      netsOff: [...S.netsOff], base: S.base, ftab: S.ftab, wide: S.wide, aemetAr: S.aemetAr, hidden: [...S.hidden], layers: { prov: S.layers.prov, cams: S.layers.cams, manual: S.layers.manual, avisos: S.layers.avisos }, sat: S.sat,
     }));
   } catch {}
 }
@@ -153,6 +153,7 @@ async function loadNow(first) {
   try { HYDRO = await getJSON(DATA_URL + "hydro.json" + bust()); } catch (e) { console.warn(e); }
   OBS10_TS = 0;   // la serie de 24 h de AEMET (toda España, ~1 MB) se pide solo cuando hace falta
   render();
+  if (typeof Avisos !== "undefined") Avisos.refresh();
   if (S.side === "station" && S.sel) openStation(S.sel, false);
   if (S.side === "rank") openRanking();
 }
@@ -199,7 +200,7 @@ function buildControls() {
     savePrefs(); buildNets(); render();
   });
 
-  for (const [id, key] of [["lyr-interp", "interp"], ["lyr-radar", "radar"], ["lyr-sat", "sat"], ["lyr-li", "li"], ["lyr-arome", "arome"],
+  for (const [id, key] of [["lyr-interp", "interp"], ["lyr-radar", "radar"], ["lyr-sat", "sat"], ["lyr-li", "li"], ["lyr-arome", "arome"], ["lyr-avisos", "avisos"],
                            ["lyr-cams", "cams"], ["lyr-manual", "manual"], ["lyr-prov", "prov"]]) {
     const el = $("#" + id);
     el.checked = !!S.layers[key];
@@ -240,6 +241,7 @@ function buildControls() {
   });
 
   $("#btn-rank").addEventListener("click", () => (S.side === "rank" ? closeSide() : openRanking()));
+  $("#btn-sum").addEventListener("click", () => (S.side === "summary" ? closeSide() : Summary.open()));
   $("#side-close").addEventListener("click", closeSide);
   $("#btn-panel").addEventListener("click", () => document.body.classList.toggle("controls-open"));
   $("#btn-locate").addEventListener("click", () => {
@@ -621,6 +623,7 @@ async function toggleLayer(key) {
   if (key === "prov") { provLayer && (on ? provLayer.addTo(map) : map.removeLayer(provLayer)); return; }
   if (key === "interp") { drawInterp(); return; }
   if (key === "arome") { on ? Arome.start() : Arome.stop(); return; }
+  if (key === "avisos") { if (typeof Avisos !== "undefined") Avisos.refresh(); return; }
   if (on && ["radar", "sat", "li"].includes(key) && S.layers.arome) { S.layers.arome = false; $("#lyr-arome").checked = false; Arome.stop(); }
   if (key === "cams") {
     if (!on) { camsLayer && map.removeLayer(camsLayer); return; }

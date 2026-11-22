@@ -25,7 +25,7 @@ from pathlib import Path
 from .common import (CURRENT_MAX_AGE, OFFLINE_AFTER, ROOT, TZ, dump_json, in_aragon, iso, load_json,
                      load_stations, log, read_csv)
 from . import qc
-from .sources import aemet, dgt, pws, saih, wu
+from .sources import aemet, avisos, dgt, pws, saih, wu
 
 FETCHERS = {
     "AEMET": aemet.fetch,
@@ -351,6 +351,16 @@ def main():
         if d or not (out / "webcams.json").exists():
             dump_json(out / "webcams.json", {"generated": iso(now), "cams": cams + d})
             state["webcams_ts"] = now
+
+    # ---- avisos de AEMET (cada 30 min; si fallan se conservan los anteriores)
+    key = __import__("os").environ.get("AEMET_API_KEY")
+    if key and (not only or "AEMET" in only) and (now - state.get("avisos_ts", 0) > 1800 or not (out / "avisos.json").exists()):
+        try:
+            av = avisos.fetch(key, now)
+            dump_json(out / "avisos.json", {"generated": iso(now), "ts": now, "avisos": av})
+            state["avisos_ts"] = now
+        except Exception as e:
+            log(f"  Avisos AEMET: ERROR {type(e).__name__}: {e}")
 
     state["last_run"] = now
     dump_json(out / "state.json", state)

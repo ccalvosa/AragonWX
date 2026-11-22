@@ -27,6 +27,13 @@ descarga los datos cada 10 minutos y los publica en la rama `data`.
   hora a hora hasta H+51, con animación y el valor de AROME bajo el ratón. Datos
   abiertos de Météo-France (Licence Ouverte 2.0) procesados en Actions y publicados
   en la rama `arome`.
+- **Avisos de AEMET** (Meteoalerta, toda España, cada 30 min): zonas coloreadas por nivel
+  (continuas si el aviso está en vigor, discontinuas si es para más tarde), un botón con
+  las zonas en aviso en Aragón y el detalle de cada aviso.
+- **Resumen del día** en Aragón: extremos (máxima, mínima, lluvia, racha y temperatura
+  ahora), ríos en aviso, reserva de los embalses y avisos. Excluye estaciones dudosas u
+  ocultas. Se puede filtrar a solo AEMET y SAIH y descargar como imagen (1080×1350) para
+  redes sociales.
 - **Animación** de las últimas 24 h de AEMET cada 10 minutos (estaciones de la zona visible).
 - **Ranking** de las estaciones de la zona visible del mapa (Aragón, una comarca o toda España).
 - **Capas**: interpolación por krigeado recortada a Aragón, radar (RainViewer),

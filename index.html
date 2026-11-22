@@ -16,7 +16,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
-<link rel="stylesheet" href="css/style.css?v=8">
+<link rel="stylesheet" href="css/style.css?v=9">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 </head>
@@ -117,6 +117,7 @@
       <section class="ctl">
         <h3>Capas</h3>
         <div class="layer-list">
+          <label class="check"><input type="checkbox" id="lyr-avisos"> Avisos de AEMET</label>
           <label class="check"><input type="checkbox" id="lyr-interp"> Interpolación (krigeado)</label>
           <label class="check"><input type="checkbox" id="lyr-radar"> Radar de precipitación</label>
           <label class="check"><input type="checkbox" id="lyr-sat"> Satélite (MTG)</label>
@@ -167,6 +168,8 @@
 
   <!-- ============ CONTROLES SOBRE EL MAPA ============ -->
   <div class="map-tools">
+    <button class="tool-btn av-pill" id="btn-avisos" hidden title="Avisos meteorológicos de AEMET"><b>⚠</b> <span></span></button>
+    <button class="tool-btn" id="btn-sum" title="Resumen del día en Aragón"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M3 2h10v12H3zM5.5 5h5M5.5 8h5M5.5 11h3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg> Resumen</button>
     <button class="tool-btn" id="btn-rank" title="Clasificación de la variable"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M2 14h3V8H2zM6.5 14h3V3h-3zM11 14h3V6h-3z" fill="currentColor"/></svg> Ranking</button>
     <button class="tool-btn" id="btn-locate" title="Mi ubicación" aria-label="Mi ubicación"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="4.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/><path d="M8 0v3M8 13v3M0 8h3M13 8h3" stroke="currentColor" stroke-width="1.6"/></svg></button>
   </div>
@@ -187,8 +190,10 @@
 <script src="js/scales.js?v=3"></script>
 <script src="js/kriging.js?v=1"></script>
 <script src="js/forecast.js?v=2"></script>
-<script src="js/app.js?v=8"></script>
+<script src="js/app.js?v=9"></script>
 <script src="js/arome.js?v=5"></script>
+<script src="js/avisos.js?v=1"></script>
+<script src="js/summary.js?v=2"></script>
 <script src="js/editor.js?v=3"></script>
 </body>
 </html>
