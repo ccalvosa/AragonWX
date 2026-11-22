@@ -1073,7 +1073,7 @@ function forecastTabsHTML(withObs) {
 function forecastBodyHTML(corrected) {
   return `<div id="tab-fc" hidden>
     <div class="fc-head"><div class="seg seg-sm" id="fdays"></div><span class="hint" id="fc-status"></span></div>
-    <div id="fc-plot" class="fc-plot"></div><div id="fc-table"></div>
+    <div id="fc-plot" class="fc-plot"></div><div id="fc-table"></div><div id="fc-verif"></div>
     <p class="credit">Previsión de <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0):
       AROME France HD 1,3 km de Météo-France e IFS y ENS de ECMWF, interpolados al punto${corrected ? " y corregidos a la altitud de la estación" : ""}.
       Arrastra para moverte en el tiempo y usa la rueda para acercar.</p></div>`;
@@ -1116,6 +1116,7 @@ async function drawForecast(t) {
   const ctx = FC, el = $("#fc-plot");
   $("#fc-status").textContent = t === "ens" ? "Cargando los 51 miembros del ENS…" : "Cargando AROME e IFS…";
   $("#fc-table").innerHTML = "";
+  if ($("#fc-verif")) $("#fc-verif").innerHTML = "";
   try {
     await plotly();
     const obsP = ctx.st?.src === "AEMET" ? ensureObs10() : Promise.resolve(null);
@@ -1128,10 +1129,73 @@ async function drawForecast(t) {
     if (t === "ens") Forecast.drawEnsemble(el, $("#fc-table"), ens, obs, ctx.days.ens, det.daily);
     else Forecast.drawDeterministic(el, det, obs, ctx.days.det);
     $("#fc-status").textContent = "";
+    if (t === "det" && ctx.st?.id) drawVerification(ctx);
   } catch (e) {
     console.warn(e);
     if (FC === ctx) $("#fc-status").textContent = `No se ha podido cargar la previsión (${e.message || e}). Inténtalo de nuevo en un rato.`;
   }
+}
+
+/* ---------- verificación: cómo ha acertado la previsión en esta estación */
+const VERIF_DAYS = 14;
+/* máxima, mínima y lluvia observadas en `days` ({x, n, p} alineados) o null */
+async function obsDaily(st, days) {
+  if (st.src === "AEMET") {
+    const m = await AemetHist.range(days).catch(() => null);
+    if (m?.get(st.id)) return m.get(st.id);
+  }
+  const months = [...new Set(days.map(d => d.slice(0, 7)))];
+  const docs = await Promise.all(months.map(loadMonth));
+  const o = { x: [], n: [], p: [] };
+  let any = false;
+  days.forEach((d, k) => {
+    const doc = docs[months.indexOf(d.slice(0, 7))], i = doc?.days?.indexOf(d) ?? -1, s = doc?.data?.[st.id];
+    for (const f of ["x", "n", "p"]) { o[f][k] = i >= 0 && s?.[f] ? s[f][i] ?? null : null; if (o[f][k] != null) any = true; }
+  });
+  return any ? o : null;
+}
+
+async function drawVerification(ctx) {
+  const box = $("#fc-verif");
+  if (!box) return;
+  box.innerHTML = `<p class="hint">Calculando cómo ha acertado la previsión aquí…</p>`;
+  const today = NOW?.day || new Date().toISOString().slice(0, 10);
+  const end = new Date(Date.parse(today + "T12:00:00Z") - 864e5).toISOString().slice(0, 10);
+  const days = dayList(new Date(Date.parse(end + "T12:00:00Z") - (VERIF_DAYS - 1) * 864e5).toISOString().slice(0, 10), end);
+  let fc, obs;
+  try { [fc, obs] = await Promise.all([Forecast.previous(ctx.lat, ctx.lon, ctx.alt), obsDaily(ctx.st, days)]); }
+  catch (e) { if (FC === ctx) box.innerHTML = ""; console.warn("verificación", e); return; }
+  if (FC !== ctx || !box.isConnected) return;
+  if (!obs) { box.innerHTML = `<p class="hint">No hay observaciones diarias guardadas de esta estación para comparar con la previsión.</p>`; return; }
+  const q = ctx.st.q || "";
+  const rows = [["x", "Máxima", 0], ["n", "Mínima", 1]].map(([f, label, qi]) => {
+    if (q[qi] === "D") return "";
+    const cells = ["arome", "ifs"].map(m => {
+      const d = days.map((day, k) => [fc[m]?.[day]?.[f], obs[f][k]]).filter(([a, b]) => a != null && b != null).map(([a, b]) => a - b);
+      if (d.length < 5) return `<td class="muted">—</td>`;
+      const bias = d.reduce((s, v) => s + v, 0) / d.length, mae = d.reduce((s, v) => s + Math.abs(v), 0) / d.length;
+      return `<td><b class="${Math.abs(bias) >= 2 ? "vf-bad" : Math.abs(bias) >= 1 ? "vf-mid" : "vf-ok"}">${signed(Math.round(bias * 10) / 10)} °C</b>
+        <small>error ${fmt(mae)} °C · ${d.length} días</small></td>`;
+    });
+    return `<tr><th>${label}</th>${cells.join("")}</tr>`;
+  });
+  let rain = "";
+  if (q[2] !== "D") {
+    const ok = days.map((day, k) => obs.p[k]).filter(v => v != null);
+    const cells = ["arome", "ifs"].map(m => {
+      const pairs = days.map((day, k) => [fc[m]?.[day]?.p, obs.p[k]]).filter(([a, b]) => a != null && b != null);
+      if (pairs.length < 5) return `<td class="muted">—</td>`;
+      const hits = pairs.filter(([a, b]) => (a >= 1) === (b >= 1)).length, tot = pairs.reduce((s, [a]) => s + a, 0);
+      return `<td><b>${hits} de ${pairs.length}</b> <small>días bien (llueve ≥ 1 mm o no) · ${fmt(tot)} mm en total</small></td>`;
+    });
+    if (ok.length >= 5) rain = `<tr><th>Lluvia <small>observada: ${fmt(ok.reduce((s, v) => s + v, 0))} mm</small></th>${cells.join("")}</tr>`;
+  }
+  if (!rows.join("") && !rain) { box.innerHTML = ""; return; }
+  box.innerHTML = `<h3 class="block-title">Cómo ha acertado aquí <small>últimos ${VERIF_DAYS} días · previsión emitida el día anterior</small></h3>
+    <table class="verif-t"><thead><tr><th></th><th>AROME 1,3 km</th><th>IFS (ECMWF)</th></tr></thead><tbody>${rows.join("")}${rain}</tbody></table>
+    <p class="hint">Sesgo: con + el modelo se pasa y con − se queda corto; el error es la diferencia media sin signo. El modelo da valores
+      horarios y la estación mide de continuo, así que en los extremos suele quedarse algo corto; en sitios con mucho relieve,
+      un sesgo fijo indica sobre todo que el punto del modelo no representa bien la estación.</p>`;
 }
 
 /* ---------- cualquier punto del mapa */

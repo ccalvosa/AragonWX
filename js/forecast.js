@@ -9,6 +9,7 @@ const Forecast = (() => {
   const TZ = "Europe/Madrid";
   const OM = "https://api.open-meteo.com/v1/forecast";
   const OME = "https://ensemble-api.open-meteo.com/v1/ensemble";
+  const OMP = "https://previous-runs-api.open-meteo.com/v1/forecast";
   const AROME = "meteofrance_arome_france_hd", IFS = "ecmwf_ifs";
   const cache = new Map();
 
@@ -295,5 +296,29 @@ const Forecast = (() => {
     } });
   }
 
-  return { deterministic, ensemble, drawDeterministic, drawEnsemble, obsFrom, madrid, registerLocale };
+  /* previsión emitida el día anterior para los últimos días (verificación): máxima, mínima y
+     lluvia diarias de AROME e IFS a partir de sus valores horarios → {arome|ifs: {día: {x, n, p}}} */
+  async function previous(lat, lon, alt, nDays = 15) {
+    const url = OMP + "?" + q({ latitude: lat.toFixed(4), longitude: lon.toFixed(4), elevation: alt, timezone: TZ, past_days: nDays,
+      forecast_days: 1, hourly: "temperature_2m_previous_day1,precipitation_previous_day1", models: `${AROME},${IFS}` });
+    const d = await get(url, "p:" + url);
+    const h = d.hourly, out = {};
+    for (const [key, m] of [["arome", AROME], ["ifs", IFS]]) {
+      const T = h[`temperature_2m_previous_day1_${m}`] || [], P = h[`precipitation_previous_day1_${m}`] || [];
+      const days = {};
+      h.time.forEach((t, i) => {
+        const day = t.slice(0, 10), o = (days[day] ||= { t: [], p: 0, np: 0 });
+        if (T[i] != null) o.t.push(T[i]);
+        if (P[i] != null) { o.p += P[i]; o.np++; }
+      });
+      out[key] = {};
+      for (const [day, o] of Object.entries(days)) {
+        if (o.t.length < 20) continue;   // día incompleto
+        out[key][day] = { x: Math.max(...o.t), n: Math.min(...o.t), p: o.np >= 20 ? Math.round(o.p * 10) / 10 : null };
+      }
+    }
+    return out;
+  }
+
+  return { deterministic, ensemble, previous, drawDeterministic, drawEnsemble, obsFrom, madrid, registerLocale };
 })();

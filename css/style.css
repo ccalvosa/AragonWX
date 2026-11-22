@@ -567,3 +567,12 @@ body.page { overflow: auto; display: block; }
   .about-table td { display: block; border: 0 !important; padding: 0.1rem 0 !important; white-space: normal !important; }
   .about-table td:last-child { color: var(--muted); }
 }
+
+/* verificación de la previsión */
+#fc-verif:not(:empty) { margin-top: 0.9rem; }
+.verif-t { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin: 0.3rem 0 0.4rem; }
+.verif-t th, .verif-t td { text-align: left; padding: 0.35rem 0.4rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+.verif-t thead th { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.verif-t tbody th { font-weight: 700; white-space: nowrap; }
+.verif-t th small, .verif-t td small { display: block; color: var(--muted); font-weight: 500; }
+.vf-ok { color: #2f9e44; } .vf-mid { color: #e8590c; } .vf-bad { color: #c92a2a; }
