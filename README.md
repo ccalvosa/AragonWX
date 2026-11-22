@@ -106,9 +106,13 @@ Los paquetes horarios de Météo-France (`SP1`, `SP2`) cubren toda Francia a 0,0
 descargan enteros: se leen las cabeceras de cada mensaje GRIB con peticiones de 160 bytes
 y luego solo se bajan la temperatura, la racha y las tres precipitaciones acumuladas
 (unos 16 MB por hora). Se recortan a España dentro del dominio de AROME (37,5–45°N, 10,5°O–5°E: todo salvo el
-extremo sur peninsular y Canarias), se reproyectan las filas a
-Mercator y se guardan como PNG de 8 bits con el valor codificado. La web los colorea con
-las mismas escalas que las estaciones.
+extremo sur peninsular y Canarias) y se guardan en su rejilla nativa de 0,01°, sin
+reproyectar ni interpolar, como PNG de 8 bits con el valor codificado. La web pinta cada
+píxel de la pantalla con el valor de la celda nativa que lo contiene, así que al acercar se
+ve la resolución real del modelo, con las mismas escalas que las estaciones.
+
+Una pasada se publica cuando tiene las 52 horas o, si se queda atascada o es más corta,
+cuando llega al menos a H+23 y lleva una hora sin ficheros nuevos.
 
 Va en su propio workflow, `.github/workflows/arome.yml` (**update-arome**), separado de
 las estaciones: un bucle que cada 10 min mira si hay una pasada nueva completa (cada 3 h,

@@ -3,11 +3,10 @@
 
    Los PNG traen un valor codificado por píxel (escala de grises,
    255 = sin dato) en una rejilla de 0,01° cuyas filas ya están
-   reproyectadas a Mercator. No se estiran como imagen: una capa
-   propia pinta cada píxel de la pantalla interpolando (bilineal)
-   entre los puntos de la rejilla y coloreando por tramos con las
-   mismas escalas que las estaciones. Así el campo se ve nítido a
-   cualquier zoom, con bordes limpios entre colores.
+   nativa de 0,01° sin reproyectar. No se estiran como imagen: una
+   capa propia pinta cada píxel de la pantalla con el valor de la
+   celda nativa que lo contiene (sin interpolar ni suavizar), así a
+   cualquier zoom se ve la resolución real del modelo.
 
    Lo publica scraper/aragonwx/arome.py en la rama «arome».
    ========================================================== */
@@ -76,33 +75,31 @@ const Arome = (() => {
 
       const [S0, W0, N0, E0] = M.bbox, gw = M.w, gh = M.h;
       const tl = map.containerPointToLatLng([-px, -py]), br = map.containerPointToLatLng([size.x + px, size.y + py]);
-      // índices fraccionarios de la rejilla: lineales en x (longitud) y en y (Mercator)
-      const fx0 = (tl.lng - W0) / (E0 - W0) * gw - 0.5, fx1 = (br.lng - W0) / (E0 - W0) * gw - 0.5;
+      // celda nativa que contiene cada píxel (vecino más próximo, sin interpolar):
+      // columnas lineales en longitud; filas a partir de la latitud real de cada fila de pantalla
+      const native = M.grid === "latlon", st = M.step || (E0 - W0) / (gw - 1);
       const mN = mercY(N0), mS = mercY(S0);
-      const fy0 = (mN - mercY(tl.lat)) / (mN - mS) * gh - 0.5, fy1 = (mN - mercY(br.lat)) / (mN - mS) * gh - 0.5;
-      const dfx = (fx1 - fx0) / cw, dfy = (fy1 - fy0) / ch;
+      const colIx = new Int32Array(cw);
+      for (let i = 0; i < cw; i++) {
+        const lon = tl.lng + (i + 0.5) / cw * (br.lng - tl.lng);
+        const ix = native ? Math.round((lon - W0) / st) : Math.floor((lon - W0) / (E0 - W0) * gw);
+        colIx[i] = ix < 0 || ix >= gw ? -1 : ix;
+      }
       const ctx = cv.getContext("2d");
       const img = ctx.createImageData(cw, ch), out = img.data;
       const codes = this._codes, T = lut(this._key);
       for (let j = 0; j < ch; j++) {
-        const fy = fy0 + (j + 0.5) * dfy;
-        if (fy < -0.5 || fy > gh - 0.5) continue;
-        const y0 = Math.max(0, Math.min(gh - 2, Math.floor(fy))), ty = Math.max(0, Math.min(1, fy - y0));
-        const r0 = y0 * gw, r1 = r0 + gw;
+        const lat = map.containerPointToLatLng([0, -py + (j + 0.5) / dpr]).lat;
+        const iy = native ? Math.round((N0 - lat) / st) : Math.floor((mN - mercY(lat)) / (mN - mS) * gh);
+        if (iy < 0 || iy >= gh) continue;
+        const row = iy * gw;
         let o = j * cw * 4;
         for (let i = 0; i < cw; i++, o += 4) {
-          const fx = fx0 + (i + 0.5) * dfx;
-          if (fx < -0.5 || fx > gw - 0.5) continue;
-          const x0 = Math.max(0, Math.min(gw - 2, Math.floor(fx))), tx = Math.max(0, Math.min(1, fx - x0));
-          const a = codes[r0 + x0], b = codes[r0 + x0 + 1], c = codes[r1 + x0], d = codes[r1 + x0 + 1];
-          let code;
-          if (a === 255 || b === 255 || c === 255 || d === 255) {   // borde del dominio: vecino más próximo
-            code = (ty < 0.5 ? (tx < 0.5 ? a : b) : (tx < 0.5 ? c : d));
-            if (code === 255) continue;
-          } else {
-            code = (a + (b - a) * tx) * (1 - ty) + (c + (d - c) * tx) * ty;
-          }
-          const k = Math.round(code * SUB) * 4;
+          const ix = colIx[i];
+          if (ix < 0) continue;
+          const code = codes[row + ix];
+          if (code === 255) continue;
+          const k = code * SUB * 4;
           if (!T[k + 3]) continue;
           out[o] = T[k]; out[o + 1] = T[k + 1]; out[o + 2] = T[k + 2]; out[o + 3] = 255;
         }
@@ -146,7 +143,7 @@ const Arome = (() => {
     cache.clear();
     $("#arome-mode").hidden = false;
     const run = new Date(M.run);
-    $("#arome-info").textContent = `Pasada de las ${String(run.getUTCHours()).padStart(2, "0")} UTC (${run.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" })} hora peninsular) del ${run.toLocaleDateString("es-ES", { day: "numeric", month: "short", timeZone: "Europe/Madrid" })} · hasta H+51 · Météo-France`;
+    $("#arome-info").textContent = `Pasada de las ${String(run.getUTCHours()).padStart(2, "0")} UTC (${run.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" })} hora peninsular) del ${run.toLocaleDateString("es-ES", { day: "numeric", month: "short", timeZone: "Europe/Madrid" })} · hasta H+${String(Math.max(...Object.values(M.hours).flat())).padStart(2, "0")} · Météo-France`;
     document.body.classList.toggle("hide-stations", $("#arome-hide").checked);
     field ||= new FieldLayer();
     if (!map.hasLayer(field)) field.addTo(map);
@@ -206,18 +203,16 @@ const Arome = (() => {
     renderLegend({ label: `AROME 1,3 km · ${d.label}`, unit: d.unit, scale: d.scale });
   }
 
-  /* valor bajo el ratón (bilineal, como el dibujo) */
+  /* valor bajo el ratón: la misma celda que se dibuja */
   function valueAt(lat, lon) {
     if (!M || !current) return null;
     const [S0, W0, N0, E0] = M.bbox, gw = M.w, gh = M.h;
-    if (lat < S0 || lat > N0 || lon < W0 || lon > E0) return null;
-    const fx = (lon - W0) / (E0 - W0) * gw - 0.5, fy = (mercY(N0) - mercY(lat)) / (mercY(N0) - mercY(S0)) * gh - 0.5;
-    const x0 = Math.max(0, Math.min(gw - 2, Math.floor(fx))), y0 = Math.max(0, Math.min(gh - 2, Math.floor(fy)));
-    const tx = Math.max(0, Math.min(1, fx - x0)), ty = Math.max(0, Math.min(1, fy - y0));
-    const q = [current[y0 * gw + x0], current[y0 * gw + x0 + 1], current[(y0 + 1) * gw + x0], current[(y0 + 1) * gw + x0 + 1]];
-    if (q.some(c => c === 255)) { const c = q[(ty < 0.5 ? 0 : 2) + (tx < 0.5 ? 0 : 1)]; return c === 255 ? null : VARS[v].dec0(c); }
-    const vals = q.map(c => VARS[v].dec0(c));
-    return (vals[0] + (vals[1] - vals[0]) * tx) * (1 - ty) + (vals[2] + (vals[3] - vals[2]) * tx) * ty;
+    const native = M.grid === "latlon", st = M.step || (E0 - W0) / (gw - 1);
+    const ix = native ? Math.round((lon - W0) / st) : Math.floor((lon - W0) / (E0 - W0) * gw);
+    const iy = native ? Math.round((N0 - lat) / st) : Math.floor((mercY(N0) - mercY(lat)) / (mercY(N0) - mercY(S0)) * gh);
+    if (ix < 0 || ix >= gw || iy < 0 || iy >= gh) return null;
+    const c = current[iy * gw + ix];
+    return c === 255 ? null : VARS[v].dec0(c);
   }
   map.on("mousemove", e => {
     if (S.anim !== "arome") return;
