@@ -26,12 +26,12 @@ const PREF_KEY = "aragonwx-prefs";
 const S = {
   mode: "now", v: "ta", hv: "x_max", filter: "all", official: false, doubtful: false, cluster: true,
   netsOff: new Set(), base: "auto", layers: { prov: true, avisos: true }, sat: "ir",
-  sel: null, side: null, anim: null, ftab: "obs", wide: false, aemetAr: false, avisosAr: false,
+  sel: null, side: null, anim: null, ftab: "obs", wide: false, aemetAr: false, avisosAr: false, rtab: "day",
   hidden: new Set(),   // estaciones ocultadas con Supr (solo en este navegador)
 };
 try {
   const p = JSON.parse(localStorage.getItem(PREF_KEY) || "{}");
-  for (const k of ["v", "hv", "filter", "official", "doubtful", "cluster", "base", "sat", "ftab", "wide", "aemetAr", "avisosAr"]) if (p[k] != null) S[k] = p[k];
+  for (const k of ["v", "hv", "filter", "official", "doubtful", "cluster", "base", "sat", "ftab", "wide", "aemetAr", "avisosAr", "rtab"]) if (p[k] != null) S[k] = p[k];
   if (p.hidden) S.hidden = new Set(p.hidden);
   if (p.netsOff) S.netsOff = new Set(p.netsOff);
   if (p.layers) S.layers = { ...S.layers, ...p.layers, radar: false, sat: false, li: false, interp: false, arome: false };
@@ -41,7 +41,7 @@ function savePrefs() {
   try {
     localStorage.setItem(PREF_KEY, JSON.stringify({
       v: S.v, hv: S.hv, filter: S.filter, official: S.official, doubtful: S.doubtful, cluster: S.cluster,
-      netsOff: [...S.netsOff], base: S.base, ftab: S.ftab, wide: S.wide, aemetAr: S.aemetAr, avisosAr: S.avisosAr, hidden: [...S.hidden], layers: { prov: S.layers.prov, cams: S.layers.cams, manual: S.layers.manual, avisos: S.layers.avisos }, sat: S.sat,
+      netsOff: [...S.netsOff], base: S.base, ftab: S.ftab, wide: S.wide, aemetAr: S.aemetAr, avisosAr: S.avisosAr, rtab: S.rtab, hidden: [...S.hidden], layers: { prov: S.layers.prov, cams: S.layers.cams, manual: S.layers.manual, avisos: S.layers.avisos }, sat: S.sat,
     }));
   } catch {}
 }
@@ -917,25 +917,40 @@ const RECDEF = [
 ];
 async function showRecords(st) {
   const id = st.id;
-  let r = null;
-  if (st.src === "AEMET") r = await AemetHist.records(id).catch(() => null);
-  else r = (await loadRecords())?.stations?.[id];
+  let all = null;
+  if (st.src === "AEMET") all = await AemetHist.records(id).catch(() => null);
+  else all = (await loadRecords())?.stations?.[id];
   const box = $("#rec-box");
-  if (!r || !box || S.sel !== id) return;
-  const dfmt = d => new Date(d + "T12:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
-  const today = st.st === "ok";
-  const tiles = RECDEF.filter(([k]) => r[k]).map(([k, label, unit, scale, live, dir]) => {
-    const [v, d] = r[k], now = today ? st[live] : null;
-    // «¡Récord hoy!» solo donde el valor del día ya no puede deshacerse: la máxima solo sube,
-    // la mínima solo baja, y lluvia y racha solo crecen (máxima más baja o mínima más alta no)
-    const beat = now != null && ["x_hi", "n_lo", "p_hi", "w_hi"].includes(k) && (dir > 0 ? now > v : now < v);
-    return `<div class="tile rec ${beat ? "beat" : ""}" style="--c:${colorFor(scale, v)}"><span class="tl">${label}</span>
-      <span class="tv num">${fmt(v, unit === "km/h" ? 0 : 1)}<small>${unit}</small></span>
-      <span class="ts">${beat ? `<b class="rec-new">¡Récord hoy! ${fmt(now, unit === "km/h" ? 0 : 1)} ${unit}</b>` : dfmt(d)}</span></div>`;
-  }).join("");
-  if (!tiles) return;
-  box.innerHTML = `<h3 class="block-title">Récords <small>desde el ${dfmt(r.from)} · ${r.n.toLocaleString("es-ES")} días${r.official ? " · serie oficial de AEMET" : " · según los datos de la estación"}</small></h3>
-    <div class="tiles rec-tiles">${tiles}</div>`;
+  if (!all || !box || S.sel !== id) return;
+  if (!all.abs) all = { abs: all };   // formato antiguo (solo absolutos)
+  const official = st.src === "AEMET";
+  const dfmt = (d, y = true) => new Date(d + "T12:00:00").toLocaleDateString("es-ES", y ? { day: "numeric", month: "short", year: "numeric" } : { day: "numeric", month: "long" });
+  const now = new Date();
+  const monthName = now.toLocaleDateString("es-ES", { month: "long" });
+  const TABS = [["day", "Diarios"], ["mon", "Mensuales"], ["abs", "Absolutos"]].filter(([k]) => all[k]);
+  if (!TABS.length) return;
+  if (!TABS.some(([k]) => k === S.rtab)) S.rtab = TABS[TABS.length - 1][0];
+  const draw = () => {
+    const sc = S.rtab, r = all[sc];
+    const today = st.st === "ok";
+    const tiles = RECDEF.filter(([k]) => r[k]).map(([k, label, unit, scale, live, dir]) => {
+      const [v, d] = r[k], cur = today ? st[live] : null;
+      // «¡Récord hoy!» solo donde el valor del día ya no puede deshacerse: la máxima solo sube,
+      // la mínima solo baja, y lluvia y racha solo crecen (máxima más baja o mínima más alta no)
+      const beat = cur != null && ["x_hi", "n_lo", "p_hi", "w_hi"].includes(k) && (dir > 0 ? cur > v : cur < v);
+      return `<div class="tile rec ${beat ? "beat" : ""}" style="--c:${colorFor(scale, v)}"><span class="tl">${label}</span>
+        <span class="tv num">${fmt(v, unit === "km/h" ? 0 : 1)}<small>${unit}</small></span>
+        <span class="ts">${beat ? `<b class="rec-new">¡Récord hoy! ${fmt(cur, unit === "km/h" ? 0 : 1)} ${unit}</b>` : sc === "day" ? d.slice(0, 4) : dfmt(d)}</span></div>`;
+    }).join("");
+    const what = sc === "day" ? `de un ${dfmt(now.toISOString().slice(0, 10), false)} · ${r.n} ${r.n === 1 ? "año" : "años"} con datos`
+      : sc === "mon" ? `de ${monthName} · ${r.n.toLocaleString("es-ES")} días` : `desde el ${dfmt(r.from)} · ${r.n.toLocaleString("es-ES")} días`;
+    box.innerHTML = `<div class="rec-head"><h3 class="block-title">Récords</h3>
+        <div class="seg seg-sm" id="rec-tabs">${TABS.map(([k, l]) => `<button data-k="${k}" class="${k === sc ? "on" : ""}">${l}</button>`).join("")}</div></div>
+      <p class="r-meta rec-what">${what}${official ? " · serie oficial de AEMET" : " · según los datos de la estación"}</p>
+      <div class="tiles rec-tiles">${tiles || `<p class="st-status">Sin datos.</p>`}</div>`;
+    $$("#rec-tabs button").forEach(btn => btn.addEventListener("click", () => { S.rtab = btn.dataset.k; savePrefs(); draw(); }));
+  };
+  draw();
 }
 
 /* ---------- avisos del control de calidad automático */

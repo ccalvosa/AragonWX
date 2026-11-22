@@ -1,9 +1,10 @@
 """
 Récords diarios de cada estación a partir de history/AAAA-MM.json.
 
-Para cada estación: máxima más alta y más baja, mínima más alta y más baja,
-día más lluvioso y racha más fuerte, cada uno con su fecha, más el primer día con
-datos y el número de días. Lo calcula el bucle una vez al día (records.json en la
+Para cada estación, en tres ámbitos (absolutos, del mes en curso y de este día del
+calendario): máxima más alta y más baja, mínima más alta y más baja, día más
+lluvioso y racha más fuerte, cada uno con su fecha, más el primer día con datos y
+el número de días. Lo calcula el bucle una vez al día (records.json en la
 rama data). AEMET no está aquí: la web saca sus récords de su serie completa en
 aemet-explorer.
 
@@ -51,7 +52,7 @@ def _load(history_dir):
     return days, cols
 
 
-def compute(history_dir):
+def compute(history_dir, today=None):
     days, cols = _load(history_dir)
     if not days:
         return {}
@@ -103,20 +104,28 @@ def compute(history_dir):
         if f in ALONE:
             out |= ~ok & (X > ALONE[f])
         X[out] = np.nan
-    # récords
+    # récords: absolutos, del mes en curso y de este día del calendario
+    today = today or days[-1]
+    scopes = {"abs": np.ones(nd, bool),
+              "mon": np.array([d[5:7] == today[5:7] for d in days]),
+              "day": np.array([d[5:10] == today[5:10] for d in days])}
     res = {}
     for j, sid in enumerate(ids):
-        r, has = {}, np.zeros(nd, bool)
-        for name, (f, hi) in KEYS.items():
-            col = V[f][:, j]
-            m = ~np.isnan(col)
-            if not m.any():
-                continue
-            has |= m
-            i = int(np.nanargmax(col) if hi else np.nanargmin(col))
-            r[name] = [round(float(col[i]), 1), days[i]]
-        if has.any():
-            r["from"] = days[int(np.argmax(has))]
-            r["n"] = int(has.sum())
-            res[sid] = r
+        st = {}
+        for sc, mask in scopes.items():
+            r, has = {}, np.zeros(nd, bool)
+            for name, (f, hi) in KEYS.items():
+                col = np.where(mask, V[f][:, j], np.nan)
+                m = ~np.isnan(col)
+                if not m.any():
+                    continue
+                has |= m
+                i = int(np.nanargmax(col) if hi else np.nanargmin(col))
+                r[name] = [round(float(col[i]), 1), days[i]]
+            if has.any():
+                r["from"] = days[int(np.argmax(has))]
+                r["n"] = int(has.sum())
+                st[sc] = r
+        if st:
+            res[sid] = st
     return res

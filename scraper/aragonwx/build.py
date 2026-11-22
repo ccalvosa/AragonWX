@@ -356,7 +356,7 @@ def main():
     if closed or state.get("records_day") != today or not (out / "records.json").exists():
         try:
             from . import records
-            rec = records.compute(a.history_dir)
+            rec = records.compute(a.history_dir, today)
             dump_json(out / "records.json", {"generated": iso(now), "stations": rec})
             state["records_day"] = today
             log(f"  Récords: {len(rec)} estaciones")

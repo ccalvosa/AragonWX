@@ -202,6 +202,9 @@ select:disabled { opacity: 0.5; cursor: default; }
 .field { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.74rem; color: var(--muted); font-weight: 600; margin-bottom: 0.45rem; }
 .mt-s { margin-top: 0.4rem; }
 .rec-tiles .tv { font-size: 1rem; }
+.rec-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: 0.4rem; }
+.rec-head .block-title { margin: 0; }
+.rec-what { margin: 0.2rem 0 0.45rem; }
 .tile.rec.beat { border-color: var(--hl); box-shadow: 0 0 0 2px color-mix(in srgb, var(--hl) 35%, transparent); }
 .rec-new { color: var(--hl); }
 .pt-pop .leaflet-popup-content { margin: 0.6rem 0.8rem; }

@@ -71,15 +71,26 @@ const AemetHist = (() => {
     const f = await station(id);
     if (!f || !f.data) return null;
     const day = i => new Date(Date.parse(f.start + "T12:00:00Z") + i * 864e5).toISOString().slice(0, 10);
-    const best = (arr, hi, mult = 1) => {
-      let bi = -1;
-      (arr || []).forEach((v, i) => { if (v != null && (bi < 0 || (hi ? v > arr[bi] : v < arr[bi]))) bi = i; });
-      return bi < 0 ? null : [Math.round(arr[bi] * mult * 10) / 10, day(bi)];
-    };
-    const d = f.data;
-    const n = (d.tmax || []).filter(v => v != null).length;
-    return { x_hi: best(d.tmax, true), x_lo: best(d.tmax, false), n_hi: best(d.tmin, true), n_lo: best(d.tmin, false),
-             p_hi: best(d.prec, true), w_hi: best(d.racha, true, 3.6), from: f.start, n, official: true };
+    const d = f.data, len = (d.tmax || d.prec || []).length;
+    const dates = Array.from({ length: len }, (_, i) => day(i));
+    const today = new Date().toISOString().slice(0, 10);
+    // absolutos, del mes en curso y de este día del calendario
+    const scopes = { abs: () => true, mon: s => s.slice(5, 7) === today.slice(5, 7), day: s => s.slice(5, 10) === today.slice(5, 10) };
+    const out = {};
+    for (const [sc, keep] of Object.entries(scopes)) {
+      const best = (arr, hi, mult = 1) => {
+        let bi = -1;
+        (arr || []).forEach((v, i) => { if (v != null && keep(dates[i]) && (bi < 0 || (hi ? v > arr[bi] : v < arr[bi]))) bi = i; });
+        return bi < 0 ? null : [Math.round(arr[bi] * mult * 10) / 10, dates[bi]];
+      };
+      let n = 0, first = null;
+      dates.forEach((s, i) => { if (keep(s) && ((d.tmax || [])[i] != null || (d.prec || [])[i] != null)) { n++; first ??= s; } });
+      if (!n) continue;
+      out[sc] = { x_hi: best(d.tmax, true), x_lo: best(d.tmax, false), n_hi: best(d.tmin, true), n_lo: best(d.tmin, false),
+                  p_hi: best(d.prec, true), w_hi: best(d.racha, true, 3.6), from: first, n };
+    }
+    out.official = true;
+    return out;
   }
 
   return { range, index, records };
