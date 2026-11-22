@@ -5,8 +5,9 @@
    255 = sin dato) en una rejilla de 0,01° cuyas filas ya están
    reproyectadas a Mercator. No se estiran como imagen: una capa
    propia pinta cada píxel de la pantalla interpolando (bilineal)
-   entre los puntos de la rejilla y coloreando con una escala
-   continua. Así el campo se ve nítido a cualquier zoom.
+   entre los puntos de la rejilla y coloreando por tramos con las
+   mismas escalas que las estaciones. Así el campo se ve nítido a
+   cualquier zoom, con bordes limpios entre colores.
 
    Lo publica scraper/aragonwx/arome.py en la rama «arome».
    ========================================================== */
@@ -29,15 +30,17 @@ const Arome = (() => {
   const base = () => (LOCAL ? "out/arome_pub/" : `https://raw.githubusercontent.com/${REPO}/arome/`);
   const mercY = lat => Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360));
 
-  /* tabla de color continua indexada por código·SUB */
+  /* tabla de color por tramos indexada por código·SUB (SUB da precisión a los bordes) */
   function lut(key) {
     if (LUTS[key]) return LUTS[key];
     const d = VARS[key], n = 255 * SUB, out = new Uint8ClampedArray((n + 1) * 4);
     for (let i = 0; i <= n; i++) {
       const val = d.dec0(i / SUB);
       if (val < d.min) continue;
-      const c = colorCont(d.scale, val);
-      if (c) out.set([c[0], c[1], c[2], 255], i * 4);
+      const s = SCALES[d.scale];
+      if (s.zero && val < s.stops[s.stops.length - 1][0]) continue;   // por debajo del primer tramo: transparente
+      const h = colorFor(d.scale, val);
+      out.set([parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16), 255], i * 4);
     }
     return (LUTS[key] = out);
   }
@@ -200,7 +203,7 @@ const Arome = (() => {
 
   function legend() {
     const d = VARS[v];
-    renderLegend({ label: `AROME 1,3 km · ${d.label}`, unit: d.unit, scale: d.scale, continuous: true });
+    renderLegend({ label: `AROME 1,3 km · ${d.label}`, unit: d.unit, scale: d.scale });
   }
 
   /* valor bajo el ratón (bilineal, como el dibujo) */

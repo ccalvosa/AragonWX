@@ -70,6 +70,18 @@ function colorCont(scale, v) {
   return s.zero ? null : _rgb(s.below);
 }
 
+/* Escalas de precipitación con más tramos: los colores de los umbrales nuevos se
+   interpolan de la paleta original, así los tonos de referencia no cambian. */
+function refineScale(key, thresholds) {
+  const hex = c => "#" + c.map(x => x.toString(16).padStart(2, "0")).join("").toUpperCase();
+  const stops = thresholds.slice().sort((a, b) => b - a).map(t => [t, hex(colorCont(key, t) || _rgb(SCALES[key].stops.at(-1)[1]))]);
+  SCALES[key] = { ...SCALES[key], stops };
+}
+refineScale("prec", [0.1, 0.2, 0.5, 1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12.5, 15, 20, 25, 30, 35, 40, 50, 60, 70, 80, 90,
+                     100, 110, 120, 150, 200, 250]);
+refineScale("prec1h", [0.1, 0.2, 0.3, 0.5, 0.75, 1, 1.5, 2, 3, 4, 5, 6, 7.5, 10, 12.5, 15, 20, 25, 30, 40, 50, 60,
+                       75, 90]);
+
 /* Texto legible sobre un fondo de color */
 function inkFor(hex) {
   const h = hex.replace("#", "");
