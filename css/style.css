@@ -283,6 +283,7 @@ body.side-open .map-tools { right: 404px; }
 .lg-ticks { display: flex; font-size: 0.6rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .lg-ticks span { flex: 1; text-align: left; transform: translateX(-50%); white-space: nowrap; overflow: visible; }
 .lg-ticks span:first-child { transform: none; }
+.lg-note { margin-top: 0.3rem; font-size: 0.66rem; color: var(--muted); }
 .lg-cats { display: flex; flex-wrap: wrap; gap: 0.25rem 0.7rem; font-size: 0.72rem; color: var(--muted); }
 .lg-cats i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 0.3rem; vertical-align: -1px; }
 

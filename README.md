@@ -46,6 +46,12 @@ descarga los datos cada 10 minutos y los publica en la rama `data`.
 - **Capas**: interpolación por krigeado recortada a Aragón, radar (RainViewer),
   satélite MTG (infrarrojo, visible, GeoColor) y rayos MTG-LI de EUMETSAT, webcams
   (propias y de la DGT), red manual de AEMET y límites provinciales.
+- **Krigeado** a resolución de pantalla en cada zoom. En temperatura (actual, máxima
+  y mínima) tiene en cuenta la altitud: se ajusta a las estaciones una recta con la
+  altitud, o dos tramos si hay inversión (la leyenda muestra el gradiente), se krigean
+  los residuos y en cada píxel se suma la tendencia con la altitud del terreno. El
+  modelo del terreno (`assets/dem.png`, ~250 m) sale de AWS Terrain Tiles (EU-DEM de
+  Copernicus y SRTM) con `scripts/make_dem.py`, una sola vez.
 - Filtros por umbral, por red y por calidad; ranking; búsqueda (`/`); tema claro/oscuro;
   enlaces directos a una estación (`#ta/9434`).
 

@@ -624,18 +624,31 @@ async function runHistory() {
 function drawInterp() {
   interpLayer && map.removeLayer(interpLayer);
   interpLayer = null;
+  interpNote("");
   const def = currentDef();
   if (!S.layers.interp || def.hydro || !RINGS) return;
-  const pts = visibleStations().filter(([s]) => s.ar).map(([s, v]) => ({ lat: s.lat, lon: s.lon, v }));
+  const pts = visibleStations().filter(([s]) => s.ar).map(([s, v]) => ({ lat: s.lat, lon: s.lon, alt: s.alt, v }));
   const kind = def.scale === "temp" ? "temp" : def.scale?.startsWith("prec") ? "prec" : def.scale === "wind" ? "wind" : def.scale === "hum" ? "hum" : "days";
-  setTimeout(() => {
+  const token = (drawInterp.n = (drawInterp.n || 0) + 1);
+  // temperatura: se espera al modelo del terreno (una sola descarga); si falla, krigeado sin altitud
+  const ready = kind === "temp" ? Interp.loadDEM().catch(e => console.warn("DEM", e)) : Promise.resolve();
+  ready.then(() => setTimeout(() => {
+    if (token !== drawInterp.n) return;   // ya se pidió otro dibujo
     const t0 = performance.now();
     const mod = Interp.fit(pts, { scale: def.scale, kind });
     if (!mod) return toast("No hay estaciones suficientes para interpolar.");
     interpLayer && map.removeLayer(interpLayer);
     interpLayer = new Interp.Layer(mod, RINGS, { opacity: 0.62 }).addTo(map);
-    console.info(`krigeado: ${mod.n} puntos en ${Math.round(performance.now() - t0)} ms`);
-  }, 30);
+    interpNote(mod.trend ? `Krigeado con altitud: ${mod.note}` : "");
+    console.info(`krigeado: ${mod.n} puntos en ${Math.round(performance.now() - t0)} ms${mod.trend ? " · " + mod.note : ""}`);
+  }, 30));
+}
+/* nota bajo la leyenda (gradiente con la altitud ajustado) */
+function interpNote(txt) {
+  let el = $("#lg-interp");
+  if (!txt) { el?.remove(); return; }
+  if (!el) { el = document.createElement("div"); el.id = "lg-interp"; el.className = "lg-note"; $("#legend").appendChild(el); }
+  el.textContent = txt;
 }
 
 /* ---------------------------------------------------------- capas extra */

@@ -1,5 +1,8 @@
 /* ==========================================================
-   Interpolación por krigeado ordinario (variograma exponencial)
+   Interpolación por krigeado ordinario (variograma exponencial).
+   En temperatura, krigeado con tendencia en altitud: recta (o dos tramos,
+   para inversiones) ajustada cada vez a las estaciones, krigeado de los
+   residuos y, en cada píxel, la altitud del modelo del terreno.
    en su forma dual: se resuelve un único sistema (n+1)×(n+1) y cada
    punto de la rejilla cuesta O(n). Antes se desagrupan las estaciones
    en celdas de ~8 km (mediana) para que las ciudades con decenas de
@@ -25,7 +28,9 @@ const Interp = (() => {
     }
     const out = [];
     for (const arr of cells.values()) {
-      out.push({ lat: median(arr.map(p => p.lat)), lon: median(arr.map(p => p.lon)), v: median(arr.map(p => p.v)) });
+      const o = { lat: median(arr.map(p => p.lat)), lon: median(arr.map(p => p.lon)), v: median(arr.map(p => p.v)) };
+      if (arr[0].z != null) o.z = median(arr.map(p => p.z));
+      out.push(o);
     }
     return out;
   }
@@ -106,24 +111,109 @@ const Interp = (() => {
   }
 
 
-  /** Ajusta el modelo a las estaciones. Devuelve {m, n, kind, scale} o null si hay pocas. */
+  /* ---------- modelo digital del terreno (assets/dem.png: altitud + 500 en R·256 + G) */
+  let DEM = null, demP = null;
+  function loadDEM() {
+    return demP ||= (async () => {
+      const meta = await (await fetch("assets/dem.json")).json();
+      const blob = await (await fetch("assets/dem.png")).blob();
+      const bmp = await createImageBitmap(blob, { colorSpaceConversion: "none", premultiplyAlpha: "none" });
+      const cv = document.createElement("canvas");
+      cv.width = bmp.width; cv.height = bmp.height;
+      const ctx = cv.getContext("2d", { willReadFrequently: true });
+      ctx.drawImage(bmp, 0, 0);
+      const px = ctx.getImageData(0, 0, bmp.width, bmp.height).data;
+      const z = new Int16Array(meta.cols * meta.rows);
+      for (let i = 0; i < z.length; i++) z[i] = px[i * 4] * 256 + px[i * 4 + 1] - meta.offset;
+      DEM = { ...meta, z };
+      return DEM;
+    })().catch(e => { demP = null; throw e; });
+  }
+  const demCol = lon => DEM ? Math.floor((lon - DEM.bbox[1]) / DEM.step) : -1;
+  const demRow = lat => DEM ? Math.floor((DEM.bbox[2] - lat) / DEM.step) : -1;
+  function demAt(lat, lon) {
+    const c = demCol(lon), r = demRow(lat);
+    return c < 0 || r < 0 || c >= DEM.cols || r >= DEM.rows ? null : DEM.z[r * DEM.cols + c];
+  }
+
+  /* ---------- tendencia con la altitud: recta, o dos tramos si hay inversión o cambio de gradiente */
+  function lsq(X, y) {
+    const k = X[0].length, A = Array.from({ length: k }, () => new Array(k).fill(0)), b = new Array(k).fill(0);
+    X.forEach((r, i) => { for (let p = 0; p < k; p++) { b[p] += r[p] * y[i]; for (let q = 0; q < k; q++) A[p][q] += r[p] * r[q]; } });
+    return solve(A, b);
+  }
+  const trendAt = (t, zkm) => t.a + t.b1 * Math.min(zkm, t.zb) + t.b2 * Math.max(zkm - t.zb, 0);
+  const clampSlope = b => Math.max(-10, Math.min(12, b));   // °C/km, por si hay pocos datos en altura
+  function fitTrend(pts) {
+    const zs = pts.map(p => p.z / 1000), y = pts.map(p => p.v);
+    const sd = Math.sqrt(zs.reduce((s, z) => s + z * z, 0) / zs.length - (zs.reduce((s, z) => s + z, 0) / zs.length) ** 2);
+    if (pts.length < 12 || sd < 0.15) return null;   // poco desnivel entre estaciones: sin tendencia
+    const sse = t => pts.reduce((s, p, i) => s + (y[i] - trendAt(t, zs[i])) ** 2, 0);
+    const lin = lsq(zs.map(z => [1, z]), y);
+    if (!lin) return null;
+    let best = { a: lin[0], b1: lin[1], b2: lin[1], zb: 99 };
+    const sLin = sse(best);
+    let sBest = sLin;
+    for (let zb = 0.5; zb <= 1.5001; zb += 0.1) {
+      const below = zs.filter(z => z < zb).length;
+      if (below < 8 || zs.length - below < 8) continue;
+      const c = lsq(zs.map(z => [1, Math.min(z, zb), Math.max(z - zb, 0)]), y);
+      if (!c) continue;
+      const t = { a: c[0], b1: c[1], b2: c[2], zb }, s = sse(t);
+      if (s < sBest) { sBest = s; best = t; }
+    }
+    if (best.zb < 99 && sBest > 0.85 * sLin) best = { a: lin[0], b1: lin[1], b2: lin[1], zb: 99 };   // dos tramos solo si mejora claro
+    best.b1 = clampSlope(best.b1); best.b2 = clampSlope(best.b2);
+    best.a = pts.reduce((s, p, i) => s + y[i] - (trendAt(best, zs[i]) - best.a), 0) / pts.length;
+    return best;
+  }
+  function describeTrend(t) {
+    const f = b => (b > 0 ? "+" : "−") + Math.abs(b).toFixed(1).replace(".", ",");
+    if (t.zb >= 99) return `${f(t.b1)} °C/km`;
+    const zb = Math.round(t.zb * 1000);
+    return `${f(t.b1)} °C/km hasta ${zb} m · ${f(t.b2)} °C/km por encima`;
+  }
+
+  /** Ajusta el modelo a las estaciones. Devuelve {m, n, kind, scale, trend, note} o null si hay pocas.
+      Temperatura con terreno cargado: tendencia con la altitud + krigeado de los residuos. */
   function fit(points, opts) {
     const kind = opts.kind || "temp";
-    let pts = decluster(points.filter(p => Number.isFinite(p.v)), opts.cell || 0.07);
-    if (kind === "temp") pts = despike(pts, 25, 6);
-    else if (kind === "wind") pts = despike(pts, 25, 35);
+    let pts = points.filter(p => Number.isFinite(p.v));
+    let trend = null;
+    if (kind === "temp" && DEM && opts.alt !== false) {
+      // altitud del terreno en cada estación (la declarada solo si cae fuera del modelo)
+      pts = pts.map(p => ({ ...p, z: demAt(p.lat, p.lon) ?? p.alt })).filter(p => Number.isFinite(p.z));
+      pts = decluster(pts, opts.cell || 0.07);
+      trend = fitTrend(pts);
+      if (trend) {
+        // fuera las que quedan muy lejos de la recta (estaciones mal situadas o averiadas) y se reajusta
+        const res = pts.map(p => p.v - trendAt(trend, p.z / 1000));
+        const mad = median(res.map(r => Math.abs(r - median(res)))) * 1.4826;
+        pts = pts.filter((p, i) => Math.abs(res[i]) <= Math.max(3 * mad, 2.5));
+        trend = fitTrend(pts) || trend;
+        pts = pts.map(p => ({ ...p, v: p.v - trendAt(trend, p.z / 1000) }));
+        pts = despike(pts, 25, 4);
+      }
+    } else {
+      pts = decluster(pts, opts.cell || 0.07);
+    }
+    if (!trend) {
+      if (kind === "temp") pts = despike(pts, 25, 6);
+      else if (kind === "wind") pts = despike(pts, 25, 35);
+    }
     if (pts.length < 5) return null;
     if (pts.length > 420) {   // límite para que el sistema se resuelva en < 1 s
       pts.sort(() => Math.random() - 0.5);
       pts = pts.slice(0, 420);
     }
     const m = train(pts, opts.rangeKm || (kind === "prec" ? 35 : 60), opts.nugget ?? 0.08);
-    return m ? { m, n: pts.length, kind, scale: opts.scale } : null;
+    return m ? { m, n: pts.length, kind, scale: opts.scale, trend, note: trend ? describeTrend(trend) : "" } : null;
   }
 
   /* Capa que evalúa el krigeado sobre la zona visible en cada zoom o desplazamiento:
-     rejilla de pantalla de unos 22 000 nodos como máximo (≥ 6 px; el campo es suave), interpolación bilineal del valor hasta cada
-     píxel, color por tramos y recorte exacto con el contorno de Aragón. */
+     rejilla de pantalla de unos 22 000 nodos como máximo (≥ 6 px; el campo es suave),
+     interpolación bilineal del valor hasta cada píxel, más la tendencia con la altitud
+     del terreno en ese píxel, color por tramos y recorte exacto con el contorno de Aragón. */
   const MAXNODES = 22000;
   const Layer = L.Layer.extend({
     initialize(model, rings, opts = {}) { this._mod = model; this._rings = rings; this._opacity = opts.opacity ?? 0.62; },
@@ -143,14 +233,13 @@ const Interp = (() => {
     },
     _hide() { this._cv.style.visibility = "hidden"; },
     _draw() {
-      const map = this._map, cv = this._cv, { m, kind, scale } = this._mod;
+      const map = this._map, cv = this._cv, { m, kind, scale, trend } = this._mod;
       const size = map.getSize(), pad = 0.15;
       const px = Math.round(size.x * pad), py = Math.round(size.y * pad);
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const W = size.x + 2 * px, H = size.y + 2 * py, cw = Math.round(W * dpr), ch = Math.round(H * dpr);
       cv.width = cw; cv.height = ch; cv.style.width = W + "px"; cv.style.height = H + "px";
-      const origin = map.containerPointToLayerPoint([-px, -py]);
-      L.DomUtil.setPosition(cv, origin);
+      L.DomUtil.setPosition(cv, map.containerPointToLayerPoint([-px, -py]));
       // rejilla gruesa (en píxeles de pantalla) sobre la vista ∩ Aragón
       const [[S0, W0], [N0, E0]] = [[39.84, -2.18], [42.94, 0.78]];
       const p0 = map.latLngToContainerPoint([N0, W0]), p1 = map.latLngToContainerPoint([S0, E0]);
@@ -173,8 +262,13 @@ const Interp = (() => {
           if (v > vmax) vmax = v;
         }
       }
+      // con tendencia: el rango de color abarca los residuos más la tendencia entre 0 y 3500 m
+      if (trend) {
+        const tv = [0, Math.min(trend.zb, 3.5), 3.5].map(z => trendAt(trend, z));
+        vmin += Math.min(...tv); vmax += Math.max(...tv);
+      }
       // tabla de color por valor (por tramos, como la leyenda)
-      const NL = 2048, span = Math.max(vmax - vmin, 1e-6), lut = new Uint8ClampedArray(NL * 4);
+      const NL = 4096, span = Math.max(vmax - vmin, 1e-6), lut = new Uint8ClampedArray(NL * 4);
       for (let k = 0; k < NL; k++) {
         const v = vmin + span * k / (NL - 1);
         if (kind === "prec" && v < 0.1) continue;
@@ -184,14 +278,38 @@ const Interp = (() => {
       }
       const img = ctx.createImageData(cw, ch), out = img.data;
       const X0 = (gx0 + px) * dpr, Y0 = (gy0 + py) * dpr, X1 = (gx1 + px) * dpr, Y1 = (gy1 + py) * dpr, cell = CELL * dpr;
-      for (let y = Math.max(0, Math.floor(Y0)); y < Math.min(ch, Math.ceil(Y1)); y++) {
+      const xa = Math.max(0, Math.floor(X0)), xb = Math.min(cw, Math.ceil(X1));
+      const ya = Math.max(0, Math.floor(Y0)), yb = Math.min(ch, Math.ceil(Y1));
+      // índices del terreno por columna y fila de píxeles (la proyección es separable)
+      let dcol = null, drow = null;
+      if (trend && DEM) {
+        dcol = new Int32Array(cw).fill(-1); drow = new Int32Array(ch).fill(-1);
+        for (let x = xa; x < xb; x++) {
+          const c = demCol(map.containerPointToLatLng([(x + 0.5) / dpr - px, 0]).lng);
+          dcol[x] = c >= 0 && c < DEM.cols ? c : -1;
+        }
+        for (let y = ya; y < yb; y++) {
+          const r = demRow(map.containerPointToLatLng([0, (y + 0.5) / dpr - py]).lat);
+          drow[y] = r >= 0 && r < DEM.rows ? r * DEM.cols : -1;
+        }
+      }
+      const Z = DEM?.z, ta = trend?.a, tb1 = trend?.b1, tb2 = trend?.b2, tzb = trend?.zb * 1000;
+      for (let y = ya; y < yb; y++) {
         const fy = (y + 0.5 - Y0) / cell, j0 = Math.min(ny - 2, Math.max(0, Math.floor(fy))), ty = Math.min(1, Math.max(0, fy - j0));
-        let o = (y * cw + Math.max(0, Math.floor(X0))) * 4;
-        for (let x = Math.max(0, Math.floor(X0)); x < Math.min(cw, Math.ceil(X1)); x++, o += 4) {
+        const rb = drow ? drow[y] : 0;
+        if (drow && rb < 0) continue;
+        let o = (y * cw + xa) * 4;
+        for (let x = xa; x < xb; x++, o += 4) {
           const fx = (x + 0.5 - X0) / cell, i0 = Math.min(nx - 2, Math.max(0, Math.floor(fx))), tx = Math.min(1, Math.max(0, fx - i0));
           const a = G[j0 * nx + i0], b = G[j0 * nx + i0 + 1], c = G[(j0 + 1) * nx + i0], d = G[(j0 + 1) * nx + i0 + 1];
-          const v = (a + (b - a) * tx) * (1 - ty) + (c + (d - c) * tx) * ty;
-          const k = Math.round((v - vmin) / span * (NL - 1)) * 4;
+          let v = (a + (b - a) * tx) * (1 - ty) + (c + (d - c) * tx) * ty;
+          if (dcol) {
+            const cc = dcol[x];
+            if (cc < 0) continue;
+            const z = Z[rb + cc];
+            v += ta + (z < tzb ? tb1 * z : tb1 * tzb + tb2 * (z - tzb)) * 0.001;
+          }
+          const k = Math.max(0, Math.min(NL - 1, Math.round((v - vmin) / span * (NL - 1)))) * 4;
           if (!lut[k + 3]) continue;
           out[o] = lut[k]; out[o + 1] = lut[k + 1]; out[o + 2] = lut[k + 2]; out[o + 3] = 255;
         }
@@ -217,5 +335,5 @@ const Interp = (() => {
     },
   });
 
-  return { fit, Layer };
+  return { fit, Layer, loadDEM };
 })();
