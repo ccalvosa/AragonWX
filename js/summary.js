@@ -147,7 +147,7 @@ const Summary = (() => {
     });
     // pie
     text("Datos: AEMET · SAIH Ebro · Weather Underground · WeatherCloud · Meteoclimatic · Ibericam · Holfuy · AVAMET", P, H - P - 26, F(500, 17), c("--muted"), "left", W - 2 * P);
-    text("estacioneszgz.meteozgz.eu", P, H - P + 8, F(700, 24), c("--accent"));
+    text("ccalvosa.github.io/AragonWX", P, H - P + 8, F(700, 24), c("--accent"));
     return new Promise(res => cv.toBlob(res, "image/png"));
   }
 
