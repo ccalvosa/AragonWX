@@ -276,7 +276,9 @@ function renderStats() {
   $("#stats").innerHTML = `<b>${ok}</b> de ${n} estaciones con datos · ${ago(NOW.ts)}<br>
     <a href="https://github.com/${REPO}" target="_blank" rel="noopener">Código y datos</a> ·
     Radar <a href="https://www.rainviewer.com" target="_blank" rel="noopener">RainViewer</a> ·
-    Satélite <a href="https://view.eumetsat.int" target="_blank" rel="noopener">EUMETSAT</a>`;
+    Satélite <a href="https://view.eumetsat.int" target="_blank" rel="noopener">EUMETSAT</a><br>
+    <button class="link-btn small" id="btn-editor">Editar la red</button>`;
+  $("#btn-editor").addEventListener("click", () => Editor.open());
 }
 
 function setMode(m) {
@@ -865,6 +867,7 @@ function openStation(id, fly = true) {
     $("#chart-title").textContent = "Cargando las últimas 24 horas…";
     ensureObs10().then(o => { if (S.sel !== id) return; const d = o?.data?.[id]; d ? plotObs10(id, d) : plotDaily(id); });
   } else plotDaily(id);
+  if (typeof Editor !== "undefined" && Editor.on) Editor.stationForm(st);
 }
 
 /* ---------- previsión (Open-Meteo) */
@@ -972,18 +975,20 @@ function openPoint(lat, lon) {
     <ul class="near-list">${near}</ul>
     ${forecastTabsHTML(false)}
     ${forecastBodyHTML(false)}
-    <div class="side-actions"><button class="btn ghost" id="btn-share">Copiar enlace</button></div>`);
+    <div class="side-actions"><button class="btn ghost" id="btn-share">Copiar enlace</button>${typeof Editor !== "undefined" ? Editor.pointButton(lat, lon) : ""}</div>`);
   $$(".near-list li").forEach(li => li.addEventListener("click", () => {
     const s = BYID.get(li.dataset.id);
     map.flyTo([s.lat, s.lon], Math.max(map.getZoom(), 11));
     openStation(s.id, false);
   }));
   $("#btn-share").addEventListener("click", () => navigator.clipboard?.writeText(location.href).then(() => toast("Enlace copiado.")));
+  if (typeof Editor !== "undefined") Editor.bindPoint(lat, lon);
   setupForecast({ lat, lon, alt: null, id: null, st: null,
     onElevation: e => { const el = $("#pt-elev"); if (el) el.textContent = `${Math.round(e)} m`; } });
 }
 
 map.on("click", e => {
+  if (typeof Editor !== "undefined" && Editor.pick(e.latlng)) return;
   if (S.anim === "obs10") return;
   openPoint(e.latlng.lat, e.latlng.lng);
   if (innerWidth < 820) document.body.classList.remove("controls-open");

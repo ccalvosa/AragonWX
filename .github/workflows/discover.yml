@@ -1,0 +1,52 @@
+name: discover-stations
+
+# Busca una vez al día estaciones de aficionados en Aragón que aún no están en
+# config/stations.csv (Wunderground, Meteoclimatic, Holfuy) y publica las
+# sugerencias en la rama «discover» (un único commit, push forzado). El editor de
+# la web las muestra para darlas de alta con un clic.
+
+on:
+  schedule:
+    - cron: "40 5 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: discover-stations
+  cancel-in-progress: true
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install requests
+
+      - name: Buscar estaciones nuevas
+        run: |
+          mkdir -p out
+          cd scraper && python -m aragonwx.discover --out ../out/discover.json
+
+      - name: Publicar en la rama discover
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir pub && cp out/discover.json pub/
+          cd pub
+          git init -q
+          git config user.name "aragonwx-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git checkout -q -b discover
+          git add .
+          git commit -q -m "discover: sugerencias $(date -u +%F) [bot]"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" discover

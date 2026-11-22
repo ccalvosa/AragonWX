@@ -93,8 +93,9 @@ No se usa Selenium: una pasada completa tarda unos 20 segundos.
    Opcional: `WU_API_KEY`.
 2. **Actions** (Settings → Actions → General → Workflow permissions): *Read and write*.
 3. **Pages** (Settings → Pages): *Deploy from a branch* → `main` / `/ (root)`.
-4. Lanzar los dos workflows una vez a mano (Actions → update-data y update-arome →
-   Run workflow). A partir de ahí se relanzan solos.
+4. Lanzar los workflows una vez a mano (Actions → update-data, update-arome y
+   discover-stations → Run workflow). Los dos primeros se relanzan solos; el de
+   sugerencias corre cada día.
 5. **Dominio propio** (opcional): en Settings → Pages → Custom domain, poner
    `estacioneszgz.meteozgz.eu`. En el DNS de meteozgz.eu, crear un `CNAME` de
    `estacioneszgz` a `ccalvosa.github.io`.
@@ -143,6 +144,38 @@ pip install -r requirements.txt
 
 Si el relé lleva más de 40 min sin publicar, el SAIH se queda sin datos. Los embalses
 y aforos conservan entonces su último valor, marcado como antiguo.
+
+## Editor de la red (altas, bajas y calidad desde la web)
+
+En el pie del panel de control, **Editar la red** pide una contraseña y activa el editor:
+
+- **Ficha de cada estación:** nombre, calidad por variable (*Contrastada* / *Deficiente*),
+  problema de hora, modelo, notas, posición y **dar de baja** o reactivar. Las bajas
+  desactivan la estación (`active=0`), no la borran, así que su histórico se conserva.
+- **Alta:** red e identificador. «Comprobar en la red» verifica que la estación responde y
+  rellena nombre, coordenadas, altitud y enlace (WU, Meteoclimatic, Holfuy; en WeatherCloud
+  hay que situarla en el mapa). También se puede hacer clic en el mapa → «Añadir una
+  estación aquí».
+- **Sugerencias:** las estaciones nuevas que encuentra cada día `discover-stations`
+  (`scraper/aragonwx/discover.py`) en Wunderground, Meteoclimatic y Holfuy, con la
+  distancia a la más cercana de la red y un aviso de posible duplicado (< 300 m).
+
+Los cambios se acumulan en el navegador y **Guardar los cambios** los sube juntos en un
+único commit a `config/stations.csv`. Entran en el mapa en la siguiente vuelta del bucle
+(≤ 10 min). Quien edita no necesita cuenta de GitHub: escribe el Worker de Cloudflare
+`aragonwx-admin` (`cloudflare/admin.js`), que guarda el token.
+
+Puesta en marcha del Worker (panel de Cloudflare → Workers & Pages → Create → Worker
+`aragonwx-admin`):
+
+1. Pegar `cloudflare/admin.js` y desplegar.
+2. En GitHub → Settings → Developer settings → Fine-grained tokens, crear un token con
+   acceso **solo al repositorio AragonWX** y permiso **Contents: Read and write**.
+3. En el Worker → Settings → Variables and Secrets: secretos `GITHUB_TOKEN` (el token) y
+   `ADMIN_PASSWORD` (la contraseña del editor).
+
+El Worker solo puede tocar `config/stations.csv`. Además comprueba la cabecera, rechaza
+borrados masivos y detecta si alguien ha guardado entre medias.
 
 ## Desarrollo local
 
