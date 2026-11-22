@@ -23,6 +23,9 @@ descarga los datos cada 10 minutos y los publica en la rama `data`.
     viento, racha, dirección y nubosidad), junto a lo observado por la estación.
   - Conjunto ENS: penachos de 51 miembros con percentiles y tabla de probabilidades por
     día (lluvia ≥ 1, 10 y 20 mm; helada; racha ≥ 70 km/h).
+  - Cómo ha acertado aquí: en cada estación, sesgo y error de la máxima y la mínima de
+    AROME e IFS en los últimos 14 días (previsión emitida el día anterior, de la API de
+    pasadas anteriores de Open-Meteo) y días de lluvia acertados.
 - **AROME 1,3 km sobre el mapa**: lluvia en 1 h, lluvia acumulada, racha y temperatura
   hora a hora hasta H+51, con animación y el valor de AROME bajo el ratón. Datos
   abiertos de Météo-France (Licence Ouverte 2.0) procesados en Actions y publicados
