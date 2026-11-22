@@ -62,7 +62,8 @@ def reachable(base=BASE, headers=None, label="SAIH"):
         r = _session(headers).get(f"{base}/api/mapa/getDatosMapa", params={"slug": f"mapa-embalses-{ZONES[2]}"},
                                   timeout=TIMEOUT, verify=False)
         if not r.ok:
-            log(f"  {label}: HTTP {r.status_code}")
+            colo = r.headers.get("X-Colo") or r.headers.get("CF-RAY", "").split("-")[-1]
+            log(f"  {label}: HTTP {r.status_code}" + (f" (Cloudflare {colo})" if colo else ""))
         return r.ok
     except Exception as e:
         log(f"  {label} no responde ({type(e).__name__})")

@@ -23,13 +23,19 @@ export default {
     }
     if (!ALLOWED.includes(url.pathname)) return new Response("not found", { status: 404 });
 
-    const upstream = await fetch(UPSTREAM + url.pathname + url.search, {
+    let upstream;
+    try {
+      upstream = await fetch(UPSTREAM + url.pathname + url.search, {
       headers: { "User-Agent": "AragonWX (+https://github.com/ccalvosa/AragonWX)", Accept: "application/json" },
-      cf: { cacheTtl: 60, cacheEverything: true },
-    });
+        cf: { cacheTtl: 60, cacheEverything: true },
+      });
+    } catch (e) {
+      return new Response("upstream error: " + e, { status: 502, headers: { "X-Colo": String(request.cf?.colo || "?") } });
+    }
     const headers = new Headers({
       "Content-Type": upstream.headers.get("Content-Type") || "application/json",
       "X-Upstream-Status": String(upstream.status),
+      "X-Colo": String(request.cf?.colo || "?"),   // centro de Cloudflare que ha hecho la petición
     });
     return new Response(upstream.body, { status: upstream.status, headers });
   },
