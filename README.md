@@ -34,6 +34,10 @@ descarga los datos cada 10 minutos y los publica en la rama `data`.
   ahora), ríos en aviso, reserva de los embalses y avisos. Excluye estaciones dudosas u
   ocultas. Se puede filtrar a solo AEMET y SAIH y descargar como imagen (1080×1350) para
   redes sociales.
+- **Anomalías** («Anomalía máx.» y «Anomalía mín.»): máxima y mínima de hoy de AEMET
+  respecto a su normal diaria (`assets/normals.json`, de `scripts/make_normals.py`:
+  media más tres armónicos anuales sobre 1991–2020 si hay ≥ 20 años; si no, todos los
+  años disponibles, mínimo 10). La ficha muestra la normal de hoy y la diferencia.
 - **Récords de cada estación** en su ficha: máxima y mínima más altas y más bajas, lluvia
   en un día y racha, con su fecha. Para AEMET, de su serie oficial completa
   (aemet-explorer); para el resto, de `history/` filtrado de errores (`records.py`).

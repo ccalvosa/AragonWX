@@ -40,6 +40,10 @@ const SCALES = {
   vrad: { below: "#00381a", stops: [
     [30, "#67000d"], [24, "#a50f15"], [18, "#d7301f"], [12, "#fc6a4a"], [6, "#fcae91"], [2, "#fde0d2"],
     [-2, "#d9d9d9"], [-6, "#c7e9c0"], [-12, "#74c476"], [-18, "#31a354"], [-24, "#006d2c"], [-30, "#00441b"]] },
+  // anomalía respecto a la normal (°C): azul más frío, rojo más cálido
+  anom: { below: "#053061", stops: [
+    [10, "#67001f"], [8, "#b2182b"], [6, "#d6604d"], [4, "#f4a582"], [2, "#fddbc7"], [-2, "#f7f7f7"],
+    [-4, "#d1e5f0"], [-6, "#92c5de"], [-8, "#4393c3"], [-10, "#2166ac"]] },
   hum: { below: "#8c510a", stops: [
     [95, "#08306b"], [90, "#08519c"], [80, "#2171b5"], [70, "#4292c6"], [60, "#6baed6"], [50, "#9ecae1"],
     [40, "#c6dbef"], [30, "#f6e8c3"], [20, "#dfc27d"], [10, "#bf812d"]] },
@@ -104,6 +108,8 @@ const VARS = {
   ta:   { group: "Temperatura", short: "Actual", label: "Temperatura actual", unit: "°C", scale: "temp", q: 0, dec: 1, filter: "temp" },
   tx:   { group: "Temperatura", short: "Máxima", label: "Máxima de hoy", unit: "°C", scale: "temp", q: 0, dec: 1, filter: "temp" },
   tn:   { group: "Temperatura", short: "Mínima", label: "Mínima de hoy", unit: "°C", scale: "temp", q: 1, dec: 1, filter: "temp" },
+  xa:   { group: "Temperatura", short: "Anomalía máx.", label: "Máxima de hoy respecto a lo normal (AEMET)", unit: "°C", scale: "anom", q: 0, dec: 1, filter: "anom", signed: true },
+  na:   { group: "Temperatura", short: "Anomalía mín.", label: "Mínima de hoy respecto a lo normal (AEMET)", unit: "°C", scale: "anom", q: 1, dec: 1, filter: "anom", signed: true },
   pr:   { group: "Precipitación", short: "Hoy", label: "Lluvia de hoy", unit: "mm", scale: "prec", q: 2, dec: 1, filter: "prec" },
   p1:   { group: "Precipitación", short: "1 h", label: "Lluvia en la última hora", unit: "mm", scale: "prec1h", q: 2, dec: 1, filter: "prec" },
   p24:  { group: "Precipitación", short: "24 h", label: "Lluvia en las últimas 24 h", unit: "mm", scale: "prec", q: 2, dec: 1, filter: "prec" },
@@ -134,6 +140,8 @@ const FILTERS = {
   prec: [["all", "Todas"], ["gt_0", "> 0 mm"], ["gte_1", "≥ 1 mm"], ["gte_5", "≥ 5 mm"], ["gte_10", "≥ 10 mm"],
          ["gte_20", "≥ 20 mm"], ["gte_40", "≥ 40 mm"], ["gte_60", "≥ 60 mm"], ["gte_100", "≥ 100 mm"]],
   wind: [["all", "Todas"], ["gte_50", "≥ 50 km/h"], ["gte_70", "≥ 70 km/h"], ["gte_90", "≥ 90 km/h"], ["gte_110", "≥ 110 km/h"]],
+  anom: [["all", "Todas"], ["gte_2", "≥ +2 °C"], ["gte_4", "≥ +4 °C"], ["gte_6", "≥ +6 °C"], ["gte_8", "≥ +8 °C"],
+         ["lte_-2", "≤ −2 °C"], ["lte_-4", "≤ −4 °C"], ["lte_-6", "≤ −6 °C"], ["lte_-8", "≤ −8 °C"]],
   hum:  [["all", "Todas"], ["lte_20", "≤ 20 %"], ["lte_30", "≤ 30 %"], ["gte_90", "≥ 90 %"]],
   days: [["all", "Todas"], ["gte_1", "≥ 1 día"], ["gte_5", "≥ 5 días"], ["gte_10", "≥ 10 días"], ["gte_20", "≥ 20 días"]],
 };

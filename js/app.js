@@ -141,6 +141,7 @@ async function loadNow(first) {
     NOW = doc;
     STATIONS = doc.rows.map(r => Object.fromEntries(doc.cols.map((c, i) => [c, r[i]])));
     BYID = new Map(STATIONS.map(s => [s.id, s]));
+    applyNormals();
     $("#updated").textContent = `Datos de las ${hhmm(doc.ts)}`;
     $("#live-pill").classList.toggle("stale", Date.now() / 1000 - doc.ts > 40 * 60);
     $("#live-pill").title = `Generado ${new Date(doc.ts * 1000).toLocaleString("es-ES")} (${ago(doc.ts)})`;
@@ -158,7 +159,29 @@ async function loadNow(first) {
   if (S.side === "rank") openRanking();
 }
 
+/* ---------- normales diarias de AEMET (assets/normals.json, scripts/make_normals.py) */
+let NORMALS = null;
+function normalAt(c, doy) {
+  let v = c[0];
+  for (let k = 1; k <= 3; k++) { const w = 2 * Math.PI * k * doy / 365.25; v += c[2 * k - 1] * Math.cos(w) + c[2 * k] * Math.sin(w); }
+  return Math.round(v * 10) / 10;
+}
+/* máxima y mínima normales de hoy y anomalías (xa, na) en las estaciones de AEMET que tienen normal */
+function applyNormals() {
+  if (!NORMALS || !STATIONS || !NOW) return;
+  const day = NOW.day || new Date().toISOString().slice(0, 10);
+  const doy = Math.round((Date.parse(day) - Date.parse(day.slice(0, 4) + "-01-01")) / 864e5);
+  for (const s of STATIONS) {
+    const n = s.src === "AEMET" && NORMALS.stations[s.id];
+    if (!n) continue;
+    if (n.x) { s.xn = normalAt(n.x, doy); s.xnp = n.xp; s.xa = s.tx != null ? Math.round((s.tx - s.xn) * 10) / 10 : null; }
+    if (n.n) { s.nn = normalAt(n.n, doy); s.nnp = n.np; s.na = s.tn != null ? Math.round((s.tn - s.nn) * 10) / 10 : null; }
+  }
+}
+const signed = (v, d = 1) => (v == null ? "–" : (v > 0 ? "+" : v < 0 ? "−" : "") + fmt(Math.abs(v), d));
+
 async function loadStatic() {
+  getJSON("assets/normals.json", { cache: "default" }).then(d => { NORMALS = d; applyNormals(); render(); }).catch(e => console.warn("normales", e));
   PROV = await getJSON("assets/provincias.geojson", { cache: "default" });
   RINGS = [];
   for (const f of PROV.features) {
@@ -338,7 +361,7 @@ function makeCluster(scaleKey) {
       const med = vals.length ? (vals.length % 2 ? vals[mid] : (vals[mid - 1] + vals[mid]) / 2) : null;
       const c = colorFor(scaleKey, med), d = cl.getAllChildMarkers()[0]?.options.dec ?? 1;
       return L.divIcon({ className: "vm-wrap", iconSize: null,
-        html: `<span class="vm cl" title="Mediana de ${cl.getChildCount()} estaciones" style="background:${c};color:${inkFor(c)}">${fmt(med, d)}</span>` });
+        html: `<span class="vm cl" title="Mediana de ${cl.getChildCount()} estaciones" style="background:${c};color:${inkFor(c)}">${scaleKey === "anom" ? signed(med, d) : fmt(med, d)}</span>` });
     },
   });
 }
@@ -425,7 +448,7 @@ function render() {
       const m = L.marker([s.lat, s.lon], {
         v, dec: def.dec, keyboard: false, riseOnHover: true,
         zIndexOffset: SOURCES[s.src]?.official ? 1000 : 0,   // AEMET y SAIH por encima si se tocan
-        icon: L.divIcon({ className: "vm-wrap", iconSize: null, html: `<span class="${cls}" style="background:${c};color:${inkFor(c)}">${fmt(v, def.dec)}</span>` }),
+        icon: L.divIcon({ className: "vm-wrap", iconSize: null, html: `<span class="${cls}" style="background:${c};color:${inkFor(c)}">${def.signed ? signed(v, def.dec) : fmt(v, def.dec)}</span>` }),
       });
       m.on("click", () => openStation(s.id));
       m.bindTooltip(`${esc(s.name)} · ${SOURCES[s.src]?.name || s.src}`, { direction: "top", offset: [0, -8], opacity: 0.95 });
@@ -929,8 +952,8 @@ function openStation(id, fly = true) {
   const ok = st.st === "ok";
   const tiles = [
     tile("Actual", fmt(st.ta), "°C", st.ta != null && colorFor("temp", st.ta), st.t ? hhmm(st.t) : ""),
-    tile("Máxima", fmt(st.tx), "°C", st.tx != null && colorFor("temp", st.tx)),
-    tile("Mínima", fmt(st.tn), "°C", st.tn != null && colorFor("temp", st.tn)),
+    tile("Máxima", fmt(st.tx), "°C", st.tx != null && colorFor("temp", st.tx), st.xn != null ? `normal ${fmt(st.xn)} · <b>${signed(st.xa)}</b>` : ""),
+    tile("Mínima", fmt(st.tn), "°C", st.tn != null && colorFor("temp", st.tn), st.nn != null ? `normal ${fmt(st.nn)} · <b>${signed(st.na)}</b>` : ""),
     tile("Lluvia hoy", fmt(st.pr), "mm", st.pr != null && colorFor("prec", st.pr)),
     tile("Última hora", fmt(st.p1), "mm", st.p1 != null && colorFor("prec1h", st.p1)),
     tile("24 horas", fmt(st.p24), "mm", st.p24 != null && colorFor("prec", st.p24)),
