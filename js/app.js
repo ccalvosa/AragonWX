@@ -32,7 +32,7 @@ try {
   const p = JSON.parse(localStorage.getItem(PREF_KEY) || "{}");
   for (const k of ["v", "hv", "filter", "official", "doubtful", "cluster", "base", "sat", "ftab", "wide"]) if (p[k] != null) S[k] = p[k];
   if (p.netsOff) S.netsOff = new Set(p.netsOff);
-  if (p.layers) S.layers = { ...S.layers, ...p.layers, radar: false, sat: false, li: false, interp: false };
+  if (p.layers) S.layers = { ...S.layers, ...p.layers, radar: false, sat: false, li: false, interp: false, arome: false };
 } catch {}
 if (!VARS[S.v]) S.v = "ta";
 function savePrefs() {
@@ -195,7 +195,7 @@ function buildControls() {
     savePrefs(); buildNets(); render();
   });
 
-  for (const [id, key] of [["lyr-interp", "interp"], ["lyr-radar", "radar"], ["lyr-sat", "sat"], ["lyr-li", "li"],
+  for (const [id, key] of [["lyr-interp", "interp"], ["lyr-radar", "radar"], ["lyr-sat", "sat"], ["lyr-li", "li"], ["lyr-arome", "arome"],
                            ["lyr-cams", "cams"], ["lyr-manual", "manual"], ["lyr-prov", "prov"]]) {
     const el = $("#" + id);
     el.checked = !!S.layers[key];
@@ -210,6 +210,7 @@ function buildControls() {
     });
   });
   $$("#base-seg button").forEach(b => b.addEventListener("click", () => { setBase(b.dataset.base); savePrefs(); }));
+  $$("#arome-mode button").forEach(b => b.addEventListener("click", () => Arome.setVar(b.dataset.av)));
   $("#zone").innerHTML = `<option value="">Ir a…</option>` + Object.keys(ZONES).map(z => `<option>${z}</option>`).join("");
   $("#zone").addEventListener("change", e => { if (ZONES[e.target.value]) map.flyToBounds(ZONES[e.target.value], { duration: 0.8 }); e.target.value = ""; });
 
@@ -397,7 +398,7 @@ function render() {
     if (S.cluster) stationsLayer.addLayers(ms); else ms.forEach(m => stationsLayer.addLayer(m));
     stationsLayer.addTo(map);
   }
-  renderLegend(def);
+  if (S.anim === "arome") Arome.legend(); else renderLegend(def);
   if (S.layers.interp) drawInterp();
   if (S.layers.manual) toggleLayer("manual");
   if (S.side === "rank") openRanking();
@@ -567,6 +568,8 @@ async function toggleLayer(key) {
   const on = S.layers[key];
   if (key === "prov") { provLayer && (on ? provLayer.addTo(map) : map.removeLayer(provLayer)); return; }
   if (key === "interp") { drawInterp(); return; }
+  if (key === "arome") { on ? Arome.start() : Arome.stop(); return; }
+  if (on && ["radar", "sat", "li"].includes(key) && S.layers.arome) { S.layers.arome = false; $("#lyr-arome").checked = false; Arome.stop(); }
   if (key === "cams") {
     if (!on) { camsLayer && map.removeLayer(camsLayer); return; }
     if (!CAMS) { try { CAMS = await getJSON(DATA_URL + "webcams.json" + bust()); } catch { return toast("No se han podido cargar las webcams."); } }
@@ -618,7 +621,7 @@ function satTimes(n = 18) {   // instantes de 10 min, con ~20 min de retraso de 
 }
 
 function refreshTimebar(goLast) {
-  if (S.anim === "obs10") return;
+  if (S.anim === "obs10" || S.anim === "arome") return;
   const radarOn = S.layers.radar && RADAR, satOn = S.layers.sat || S.layers.li;
   if (!radarOn && !satOn) { stopTimebar(); return; }
   let frames;
@@ -638,6 +641,7 @@ function refreshTimebar(goLast) {
 function showFrame(i) {
   TB.i = +i;
   if (S.anim === "obs10") return showObs10Frame(TB.i);
+  if (S.anim === "arome") return Arome.show(TB.i);
   const f = TB.frames[TB.i];
   if (!f) return;
   $("#tb-label").textContent = new Date(f.t).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) + (f.nowcast ? " (previsión)" : "");
@@ -680,11 +684,12 @@ $("#tb-play").addEventListener("click", () => {
     TB.i = (TB.i + 1) % n;
     $("#tb-range").value = TB.i;
     showFrame(TB.i);
-  }, S.anim === "obs10" ? 350 : 700);
+  }, S.anim === "obs10" ? 350 : S.anim === "arome" ? 650 : 700);
 });
 
 /* animación de las observaciones diezminutales de AEMET */
 async function startObs10Anim() {
+  if (S.layers.arome) { S.layers.arome = false; $("#lyr-arome").checked = false; Arome.stop(); }
   $("#anim-btn").textContent = "Cargando…";
   await ensureObs10();
   $("#anim-btn").textContent = "▶ Animar las últimas 24 h de AEMET";

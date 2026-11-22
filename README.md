@@ -23,6 +23,10 @@ descarga los datos cada 10 minutos y los publica en la rama `data`.
     viento, racha, dirección y nubosidad), junto a lo observado por la estación.
   - Conjunto ENS: penachos de 51 miembros con percentiles y tabla de probabilidades por
     día (lluvia ≥ 1, 10 y 20 mm; helada; racha ≥ 70 km/h).
+- **AROME 1,3 km sobre el mapa**: lluvia en 1 h, lluvia acumulada, racha y temperatura
+  hora a hora hasta H+51, con animación y el valor de AROME bajo el ratón. Datos
+  abiertos de Météo-France (Licence Ouverte 2.0) procesados en Actions y publicados
+  en la rama `arome`.
 - **Animación** de las últimas 24 h de AEMET cada 10 minutos (estaciones de la zona visible).
 - **Ranking** de las estaciones de la zona visible del mapa (Aragón, una comarca o toda España).
 - **Capas**: interpolación por krigeado recortada a Aragón, radar (RainViewer),
@@ -94,6 +98,19 @@ No se usa Selenium: una pasada completa tarda unos 20 segundos.
 5. **Dominio propio** (opcional): en Settings → Pages → Custom domain, poner
    `estacioneszgz.meteozgz.eu`. En el DNS de meteozgz.eu, crear un `CNAME` de
    `estacioneszgz` a `ccalvosa.github.io`.
+
+## AROME 1,3 km (`scraper/aragonwx/arome.py`)
+
+Los paquetes horarios de Météo-France (`SP1`, `SP2`) cubren toda Francia a 0,01°. No se
+descargan enteros: se leen las cabeceras de cada mensaje GRIB con peticiones de 160 bytes
+y luego solo se bajan la temperatura, la racha y las tres precipitaciones acumuladas
+(unos 16 MB por hora). Se recortan a Aragón y alrededores, se reproyectan las filas a
+Mercator y se guardan como PNG de 8 bits con el valor codificado. La web los colorea con
+las mismas escalas que las estaciones.
+
+Cada vuelta del bucle dedica como mucho 4 minutos a AROME. La última pasada completa
+(cada 3 h, H+00 a H+51) se procesa en 2 o 3 vueltas y se publica en la rama `arome`
+(~7 MB).
 
 ## SAIH desde GitHub Actions
 
