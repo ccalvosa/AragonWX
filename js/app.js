@@ -208,16 +208,8 @@ function buildControls() {
     el.checked = !!S.layers[key];
     el.addEventListener("change", () => { S.layers[key] = el.checked; savePrefs(); toggleLayer(key); });
   }
-  $$("#sat-mode button").forEach(b => {
-    b.classList.toggle("on", b.dataset.sat === S.sat);
-    b.addEventListener("click", () => {
-      S.sat = b.dataset.sat; savePrefs();
-      $$("#sat-mode button").forEach(x => x.classList.toggle("on", x === b));
-      if (S.layers.sat) { satLayer && map.removeLayer(satLayer); satLayer = null; toggleLayer("sat"); }
-    });
-  });
+  initToolMenus();
   $$("#base-seg button").forEach(b => b.addEventListener("click", () => { setBase(b.dataset.base); savePrefs(); }));
-  $$("#arome-mode button").forEach(b => b.addEventListener("click", () => Arome.setVar(b.dataset.av)));
   $("#zone").innerHTML = `<option value="">Ir a…</option>` + Object.keys(ZONES).map(z => `<option>${z}</option>`).join("");
   $("#zone").addEventListener("change", e => { if (ZONES[e.target.value]) map.flyToBounds(ZONES[e.target.value], { duration: 0.8 }); e.target.value = ""; });
 
@@ -655,6 +647,11 @@ function interpNote(txt) {
 let satLayer = null, liLayer = null;
 
 async function toggleLayer(key) {
+  await toggleLayerInner(key);
+  syncTools();
+}
+
+async function toggleLayerInner(key) {
   const on = S.layers[key];
   if (key === "prov") { provLayer && (on ? provLayer.addTo(map) : map.removeLayer(provLayer)); return; }
   if (key === "interp") { drawInterp(); return; }
@@ -687,7 +684,6 @@ async function toggleLayer(key) {
     return;
   }
   if (key === "sat" || key === "li") {
-    $("#sat-mode").hidden = !S.layers.sat;
     if (key === "sat" && !on) { satLayer && map.removeLayer(satLayer); satLayer = null; }
     if (key === "li" && !on) { liLayer && map.removeLayer(liLayer); liLayer = null; }
     refreshTimebar(true);
@@ -701,7 +697,71 @@ function camPopup(c) {
     <a class="btn-link" href="${esc(c.link)}" target="_blank" rel="noopener">${c.img ? "Abrir imagen" : "Ver la cámara"} ↗</a></div>`;
 }
 
-$$("#radar-mode [data-rm]").forEach(b => b.addEventListener("click", () => { Radar.setMode(b.dataset.rm); refreshTimebar(true); }));
+
+/* ---------- menús de la barra superior: radar, satélite y modelos */
+function applyHide() {
+  document.body.classList.toggle("hide-stations",
+    !!((S.layers.arome && $("#arome-hide").checked) || (S.layers.radar && $("#radar-hide").checked)));
+}
+function setLayer(key, on) {
+  if (!!S.layers[key] === on) return Promise.resolve();
+  $("#lyr-" + key).checked = on;
+  S.layers[key] = on; savePrefs();
+  return toggleLayer(key);
+}
+const CHOOSE = {
+  radar: async v => {
+    if (v === "off") return setLayer("radar", false);
+    Radar.setMode(v);
+    if (S.layers.radar) refreshTimebar(true); else await setLayer("radar", true);
+  },
+  sat: async v => {
+    if (v === "off") return setLayer("sat", false);
+    const changed = S.sat !== v;
+    S.sat = v; savePrefs();
+    if (!S.layers.sat) return setLayer("sat", true);
+    if (changed) { satLayer && map.removeLayer(satLayer); satLayer = null; await toggleLayer("sat"); }
+  },
+  model: async v => {
+    if (v === "off") return setLayer("arome", false);
+    if (!S.layers.arome) await setLayer("arome", true);
+    if (S.layers.arome) Arome.setVar(v);
+  },
+};
+function closeMenus() {
+  $$(".tool-menu").forEach(m => (m.hidden = true));
+  $$(".map-tools [data-menu]").forEach(b => b.setAttribute("aria-expanded", "false"));
+}
+function initToolMenus() {
+  $$(".map-tools [data-menu]").forEach(b => b.addEventListener("click", e => {
+    e.stopPropagation();
+    const m = $("#" + b.dataset.menu), open = m.hidden;
+    closeMenus();
+    m.hidden = !open;
+    b.setAttribute("aria-expanded", String(open));
+  }));
+  $$(".tool-menu").forEach(m => m.addEventListener("click", e => e.stopPropagation()));
+  document.addEventListener("click", closeMenus);
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeMenus(); });
+  for (const [box, kind] of [["#radar-opts", "radar"], ["#sat-opts", "sat"], ["#model-opts", "model"]]) {
+    $$(box + " button").forEach(b => b.addEventListener("click", async () => { await CHOOSE[kind](b.dataset.v); syncTools(); }));
+  }
+  $("#radar-hide").addEventListener("change", applyHide);
+  syncTools();
+}
+const SATNAME = { ir: "Infrarrojo", vis: "Visible", geo: "GeoColor" };
+const MODELNAME = { pr1: "lluvia 1 h", pacc: "acumulada", gust: "racha", t2m: "temperatura" };
+function syncTools() {
+  if (!$("#btn-radar")) return;
+  const rm = S.layers.radar ? Radar.mode() : "off", sm = S.layers.sat ? S.sat : "off", am = S.layers.arome ? Arome.current() : "off";
+  const mark = (box, v) => $$(box + " button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
+  mark("#radar-opts", rm); mark("#sat-opts", sm); mark("#model-opts", am);
+  const state = (btn, on, txt) => { $(btn).classList.toggle("on", on); $(btn + " .tool-state").textContent = txt; };
+  state("#btn-radar", rm !== "off", rm === "v" ? "velocidad" : rm === "z" ? "reflectividad" : "");
+  state("#btn-sat", sm !== "off" || !!S.layers.li, [sm !== "off" && SATNAME[sm].toLowerCase(), S.layers.li && "rayos"].filter(Boolean).join(" + "));
+  state("#btn-model", am !== "off", am !== "off" ? "AROME · " + MODELNAME[am] : "");
+  applyHide();
+}
 
 /* ---------- barra de tiempo: radar, satélite, rayos y animación AEMET */
 const SAT_LAYERS = { ir: "mtg_fd:ir105_hrfi", vis: "mtg_fd:vis06_hrfi", geo: "mtg_fd:rgb_geocolour" };

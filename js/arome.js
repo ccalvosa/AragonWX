@@ -144,7 +144,7 @@ const Arome = (() => {
     $("#arome-mode").hidden = false;
     const run = new Date(M.run);
     $("#arome-info").textContent = `Pasada de las ${String(run.getUTCHours()).padStart(2, "0")} UTC (${run.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" })} hora peninsular) del ${run.toLocaleDateString("es-ES", { day: "numeric", month: "short", timeZone: "Europe/Madrid" })} · hasta H+${String(Math.max(...Object.values(M.hours).flat())).padStart(2, "0")} · Météo-France`;
-    document.body.classList.toggle("hide-stations", $("#arome-hide").checked);
+    applyHide();
     field ||= new FieldLayer();
     if (!map.hasLayer(field)) field.addTo(map);
     setVar(v, true);
@@ -190,7 +190,7 @@ const Arome = (() => {
     if (field && map.hasLayer(field)) map.removeLayer(field);
     current = null; tip.hidden = true;
     $("#arome-mode").hidden = true;
-    document.body.classList.remove("hide-stations");
+    applyHide();
     if (S.anim === "arome") {
       clearInterval(TB.timer); TB.timer = null; $("#tb-play").textContent = "▶";
       S.anim = null; $("#timebar").hidden = true;
@@ -225,7 +225,7 @@ const Arome = (() => {
     tip.hidden = false;
   });
   map.on("mouseout", () => (tip.hidden = true));
-  $("#arome-hide").addEventListener("change", e => document.body.classList.toggle("hide-stations", e.target.checked && S.anim === "arome"));
+  $("#arome-hide").addEventListener("change", applyHide);
 
-  return { start, stop, show, setVar, legend, active: () => S.anim === "arome" };
+  return { start, stop, show, setVar, legend, current: () => v, active: () => S.anim === "arome" };
 })();

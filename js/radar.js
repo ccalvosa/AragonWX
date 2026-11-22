@@ -223,7 +223,6 @@ const Radar = (() => {
   }
   function setMode(m) {
     mode = m;
-    $$("#radar-mode [data-rm]").forEach(b => b.classList.toggle("on", b.dataset.rm === m));
     if (mode === "v") M?.frames.forEach(f => f.v && png(f.v).catch(() => {}));
   }
 
