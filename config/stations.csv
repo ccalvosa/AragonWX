@@ -611,7 +611,7 @@ IB_CABRA,IBERICAM,Cabra de Mora,Teruel,40.31751,-0.80796,1129,https://ibericam.c
 IB_CANADA,IBERICAM,Cañada Vellida,Teruel,40.70656,-0.91698,1326,,Ecovitt GW-2002,ALTITUD: 1322 ZONA HABITADA: SI,,,,,,,1
 IB_CASTELL,IBERICAM,El Castellar,Teruel,40.36530,-0.81690,1241,https://ibericam.com/el-tiempo/widget.php?station=el-castellar,Davis Vantage VUE,ALTITUD: 1241 ZONA HABITADA: SI,,,,,,,1
 IB_POBO,IBERICAM,El Pobo,Teruel,40.50758,-0.85856,1400,https://ibericam.com/el-tiempo/widget.php?station=el-pobo,Ecovitt GW-2002,ALTITUD: 1400 ZONA HABITADA: SI,,,,,,,1
-IB_HOYALTA,IBERICAM,El Pobo - Hoyalta,Teruel,40.53732,-0.91091,1753,https://ibericam.com/el-tiempo/widget.php?station=el-pobo-hoyalta,Davis VP2,ALTITUD: 1750 ZONA HABITADA: NO,,,,,,,1
+IB_HOYALTA,IBERICAM,El Pobo - Hoyalta,Teruel,40.53732,-0.91091,1753,https://ibericam.com/el-tiempo/widget.php?station=el-pobo-hoyalta,Davis VP2,ALTITUD: 1750 ZONA HABITADA: NO,Deficiente,Deficiente,Deficiente,Deficiente,,,1
 IB_FORM,IBERICAM,Formiche,Teruel,40.32427,-0.89165,1124,https://ibericam.com/el-tiempo/widget.php?station=formiche,Davis Vantage VUE,ALTITUD: 1115 ZONA HABITADA: SI,,,,,,,1
 IB_FORTAN,IBERICAM,Fortanete,Teruel,40.50399,-0.52473,1354,https://ibericam.com/el-tiempo/widget.php?station=fortanete,Davis VP2,ALTITUD: 1354 ZONA HABITADA: SI,,,,,,,1
 IB_LASDEH,IBERICAM,Fortanete-Las Dehesas,Teruel,40.51756,-0.49626,1411,https://ibericam.com/el-tiempo/widget.php?station=fortanete-las-dehesas,Ecovitt WS90,ALTITUD: 1435 ZONA HABITADA: NO,,,,,,,1
