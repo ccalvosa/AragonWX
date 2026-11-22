@@ -263,8 +263,8 @@ def main():
                 1 if not st.get("extra") or in_aragon(st["lat"], st["lon"], margin=0.3) else 0]
         if not st["active"] or (only and src not in only):
             o = {"st": "na"}
-        elif src in results:
-            o = process(st, results[src].get(st["id"]), state, now, today)
+        elif src in results and st["id"] in results[src]:
+            o = process(st, results[src][st["id"]], state, now, today)
         else:
             o = {"st": "off"}
         s = stats.setdefault(src, {"n": 0, "ok": 0, "off": 0})

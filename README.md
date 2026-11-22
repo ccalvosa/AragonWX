@@ -89,6 +89,23 @@ No se usa Selenium: una pasada completa tarda unos 20 segundos.
    `estacioneszgz.meteozgz.eu`. En el DNS de meteozgz.eu, crear un `CNAME` de
    `estacioneszgz` a `ccalvosa.github.io`.
 
+## Relé del SAIH
+
+saihebro.com no acepta conexiones desde GitHub Actions. El workflow lo intenta y,
+si no responde en 6 s, usa los datos crudos de la rama `saih`. Esa rama la publica
+`aragonwx.saih_relay`, que corre en cualquier máquina que llegue al SAIH y pueda
+hacer push al repo:
+
+```bash
+git clone git@github.com:ccalvosa/AragonWX.git && cd AragonWX/scraper
+pip install -r requirements.txt
+# crontab -e
+*/10 * * * * cd /ruta/AragonWX/scraper && python3 -m aragonwx.saih_relay --push >> /tmp/saih_relay.log 2>&1
+```
+
+Si el relé lleva más de 40 min sin publicar, el SAIH se queda sin datos. Los embalses
+y aforos conservan entonces su último valor, marcado como antiguo.
+
 ## Desarrollo local
 
 ```bash

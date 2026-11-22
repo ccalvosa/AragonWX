@@ -8,12 +8,24 @@ SAIH Ebro: todo por su API JSON pública (sin Selenium).
 
 Las temperaturas solo dan el valor actual: la máxima y la mínima del día las
 calcula el orquestador con las lecturas de cada pasada (estado persistente).
+
+saihebro.com no acepta conexiones desde las máquinas de GitHub Actions. Por eso,
+si la descarga directa falla, se usan los datos crudos que publica un relé en la
+rama «saih» (python -m aragonwx.saih_relay --push, en cualquier máquina que sí
+llegue al SAIH). Si ninguna de las dos vías da datos frescos, el SAIH se queda sin
+datos en esa pasada.
 """
 
+import os
+import time
 import unicodedata
 from datetime import datetime
 
 from ..common import TZ, log, num, pmap, session
+
+RELAY_URL = "https://raw.githubusercontent.com/{repo}/saih/saih_raw.json"
+RELAY_MAX_AGE = 40 * 60
+TIMEOUT = (6, 25)   # (conexión, lectura)
 
 BASE = "https://www.saihebro.com"
 ZONES = ["H3-aragon-irati", "H4-medio-ebro-mi", "H5-gallego", "H6-bajo-cinca", "H7-segre",
@@ -35,18 +47,29 @@ def _ts(s):
         return None
 
 
+def reachable():
+    """Una petición rápida para no esperar 56 timeouts si el SAIH no responde."""
+    try:
+        r = session().get(f"{BASE}/api/mapa/getDatosMapa", params={"slug": f"mapa-embalses-{ZONES[2]}"},
+                          timeout=TIMEOUT, verify=False)
+        return r.ok
+    except Exception as e:
+        log(f"  SAIH no responde ({type(e).__name__})")
+        return False
+
+
 def fetch_maps():
-    """{tag: (tipo_señal, valor, ts, codigo_estacion, nombre)} y {codigo: estación cruda}."""
+    """{tag: [tipo_señal, valor, ts, codigo_estacion, nombre]}."""
     s = session()
     jobs = [(k, z) for k in KINDS for z in ZONES]
 
     def one(job):
         k, z = job
-        r = s.get(f"{BASE}/api/mapa/getDatosMapa", params={"slug": f"mapa-{k}-{z}"}, timeout=30, verify=False)
+        r = s.get(f"{BASE}/api/mapa/getDatosMapa", params={"slug": f"mapa-{k}-{z}"}, timeout=TIMEOUT, verify=False)
         r.raise_for_status()
         return r.json().get("DATOS", [])
 
-    tags, stations = {}, {}
+    tags = {}
     fails = 0
     for job, datos in pmap(one, jobs, workers=8):
         if datos is None:
@@ -54,20 +77,18 @@ def fetch_maps():
             continue
         for e in datos:
             cod = e.get("CW_REMOTA_TXT")
-            if cod:
-                stations[cod] = e
             for t in e.get("TAGS", []):
-                tags[t.get("LS_TAG_TXT")] = (t.get("LS_TIPO_SENAL"), num(t.get("VALOR"), 3),
-                                             _ts(t.get("ULTIMA_FECHA", "")), cod, e.get("LR_NOMBRE_CORTO"))
+                tags[t.get("LS_TAG_TXT")] = [t.get("LS_TIPO_SENAL"), num(t.get("VALOR"), 3),
+                                             _ts(t.get("ULTIMA_FECHA", "")), cod, e.get("LR_NOMBRE_CORTO")]
     if fails:
         log(f"  SAIH: {fails}/{len(jobs)} mapas fallidos")
-    return tags, stations
+    return tags
 
 
 def fetch_pluvio():
     s = session()
     try:
-        r = s.get(f"{BASE}/api/pluviometrias/getTablaPluviometrias", timeout=30, verify=False)
+        r = s.get(f"{BASE}/api/pluviometrias/getTablaPluviometrias", timeout=TIMEOUT, verify=False)
         r.raise_for_status()
         rows = r.json()
     except Exception as e:
@@ -85,10 +106,39 @@ def fetch_pluvio():
     return out
 
 
+def download_raw():
+    """Descarga directa: {'ts', 'tags', 'pluvio'} o None si el SAIH no responde."""
+    if not reachable():
+        return None
+    tags, pluvio = fetch_maps(), fetch_pluvio()
+    if not tags and not pluvio:
+        return None
+    return {"ts": int(time.time()), "tags": tags, "pluvio": pluvio}
+
+
+def from_relay():
+    repo = os.environ.get("GITHUB_REPOSITORY", "ccalvosa/AragonWX")
+    try:
+        r = session().get(RELAY_URL.format(repo=repo), params={"t": int(time.time() // 60)}, timeout=(6, 30))
+        r.raise_for_status()
+        d = r.json()
+    except Exception as e:
+        log(f"  SAIH relé: no disponible ({type(e).__name__})")
+        return None
+    age = time.time() - d.get("ts", 0)
+    if age > RELAY_MAX_AGE:
+        log(f"  SAIH relé: datos de hace {age / 60:.0f} min, demasiado viejos")
+        return None
+    log(f"  SAIH relé: datos de hace {age / 60:.0f} min")
+    return d
+
+
 def fetch(stations, ctx):
-    tags, raw = fetch_maps()
-    pluvio = fetch_pluvio()
-    ctx["saih_raw"] = raw
+    raw = download_raw() or from_relay()
+    if not raw:
+        ctx["saih_tags"] = {}
+        return {}
+    tags, pluvio = raw["tags"], raw["pluvio"]
     ctx["saih_tags"] = tags
     # temperatura / humedad / viento de cada estación por su código de remota
     by_station = {}
@@ -127,7 +177,6 @@ def fetch(stations, ctx):
 
 def hydro(reservoirs, gauges, ctx):
     """Valores actuales de embalses y aforos a partir de los mapas ya descargados."""
-    raw = ctx.get("saih_raw") or {}
     tags = ctx.get("saih_tags") or {}
     sig = {}
     for tag, (kind, val, ts, cod, _) in tags.items():
@@ -136,8 +185,7 @@ def hydro(reservoirs, gauges, ctx):
     res = {}
     for r in reservoirs:
         s = sig.get(r["id"], {})
-        e = raw.get(r["id"], {})
-        vol = s.get("VEMBA", (num(e.get("VALOR_SENAL2_FICHA"), 3), None))[0]
+        vol = s.get("VEMBA", (None, None))[0]
         lvl = s.get("NEMBA", (None, None))[0]
         ts = max([x[1] for x in s.values() if x[1]] or [None]) if s else None
         if vol is None:

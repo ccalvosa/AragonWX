@@ -87,10 +87,16 @@ jobs:
             done
             rm -f out/closed_days.txt
           }
+          if [ -z "${AEMET_API_KEY}" ]; then
+            echo "::error::El secreto AEMET_API_KEY no llega al job: debe ser un *Repository secret* (Settings → Secrets and variables → Actions → Secrets), no una variable ni un secreto de entorno. Si lo acabas de crear, relanza el workflow."
+          fi
           end=$(( $(date +%s) + LOOP_MINUTES * 60 ))
           while :; do
             start=$(date +%s)
             echo "::group::$(date -u +%FT%TZ)"
+            # código al día sin relanzar el bucle (los cambios del propio workflow sí necesitan relanzarlo)
+            git pull -q --rebase origin "${GITHUB_REF_NAME}" || echo "::warning::no se pudo actualizar el código"
+            git log -1 --format='código: %h %s'
             (cd scraper && python -m aragonwx.build --out ../out --history-dir ../history) \
               || echo "::warning::la pasada ha fallado"
             [ -f out/closed_days.txt ] && { save_history || echo "::warning::no se pudo guardar el histórico"; }
