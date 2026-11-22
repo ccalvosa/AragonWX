@@ -216,7 +216,10 @@ const Interp = (() => {
      del terreno en ese píxel, color por tramos y recorte exacto con el contorno de Aragón. */
   const MAXNODES = 22000;
   const Layer = L.Layer.extend({
-    initialize(model, rings, opts = {}) { this._mod = model; this._rings = rings; this._opacity = opts.opacity ?? 0.62; },
+    initialize(model, rings, opts = {}) {
+      this._mod = model; this._rings = rings; this._opacity = opts.opacity ?? 0.62;
+      this._unit = opts.unit || ""; this._dec = opts.dec ?? 1;
+    },
     onAdd(map) {
       this._map = map;
       this._cv = L.DomUtil.create("canvas", "interp-canvas leaflet-zoom-hide");
@@ -224,12 +227,44 @@ const Interp = (() => {
       map.getPane("interp").appendChild(this._cv);
       map.on("moveend zoomend resize viewreset", this._draw, this);
       map.on("zoomstart", this._hide, this);
+      map.on("mousemove", this._move, this);
+      map.on("mouseout", this._out, this);
+      this._tip = L.DomUtil.create("div", "arome-tip");
+      this._tip.hidden = true;
+      document.querySelector(".mapapp").appendChild(this._tip);
       this._draw();
     },
     onRemove(map) {
       map.off("moveend zoomend resize viewreset", this._draw, this);
       map.off("zoomstart", this._hide, this);
+      map.off("mousemove", this._move, this);
+      map.off("mouseout", this._out, this);
       this._cv.remove();
+      this._tip.remove();
+    },
+    _out() { this._tip.hidden = true; },
+    /* valor bajo el ratón: el mismo cálculo que el dibujo (sin la interpolación de la rejilla) */
+    _move(e) {
+      const tip = this._tip;
+      // solo donde hay color pintado (dentro de Aragón y con valor)
+      const lp = this._map.containerPointToLayerPoint(e.containerPoint), pos = L.DomUtil.getPosition(this._cv), dpr = this._dpr || 1;
+      const x = Math.round((lp.x - pos.x) * dpr), y = Math.round((lp.y - pos.y) * dpr);
+      if (this._cv.style.visibility === "hidden" || x < 0 || y < 0 || x >= this._cv.width || y >= this._cv.height
+          || !this._cv.getContext("2d").getImageData(x, y, 1, 1).data[3]) { tip.hidden = true; return; }
+      const { m, kind, trend } = this._mod, { lat, lng } = e.latlng;
+      let v = predict(m, lat, lng);
+      if (kind === "prec" || kind === "wind" || kind === "hum") v = Math.max(0, v);
+      let alt = "";
+      if (trend && DEM) {
+        const z = demAt(lat, lng);
+        if (z == null) { tip.hidden = true; return; }
+        v += trendAt(trend, z / 1000);
+        alt = ` · ${Math.round(z).toLocaleString("es-ES")} m`;
+      }
+      tip.textContent = `Krigeado ${fmt(v, this._dec)} ${this._unit}${alt}`;
+      tip.style.left = e.containerPoint.x + 14 + "px";
+      tip.style.top = e.containerPoint.y - 10 + "px";
+      tip.hidden = false;
     },
     _hide() { this._cv.style.visibility = "hidden"; },
     _draw() {
@@ -239,13 +274,14 @@ const Interp = (() => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const W = size.x + 2 * px, H = size.y + 2 * py, cw = Math.round(W * dpr), ch = Math.round(H * dpr);
       cv.width = cw; cv.height = ch; cv.style.width = W + "px"; cv.style.height = H + "px";
+      this._dpr = dpr;
       L.DomUtil.setPosition(cv, map.containerPointToLayerPoint([-px, -py]));
       // rejilla gruesa (en píxeles de pantalla) sobre la vista ∩ Aragón
       const [[S0, W0], [N0, E0]] = [[39.84, -2.18], [42.94, 0.78]];
       const p0 = map.latLngToContainerPoint([N0, W0]), p1 = map.latLngToContainerPoint([S0, E0]);
       const gx0 = Math.max(-px, Math.floor(p0.x)), gy0 = Math.max(-py, Math.floor(p0.y));
       const gx1 = Math.min(size.x + px, Math.ceil(p1.x)), gy1 = Math.min(size.y + py, Math.ceil(p1.y));
-      const ctx = cv.getContext("2d");
+      const ctx = cv.getContext("2d", { willReadFrequently: true });
       if (gx1 <= gx0 || gy1 <= gy0) { cv.style.visibility = "visible"; return; }
       const CELL = Math.max(6, Math.ceil(Math.sqrt((gx1 - gx0) * (gy1 - gy0) / MAXNODES)));
       const nx = Math.ceil((gx1 - gx0) / CELL) + 1, ny = Math.ceil((gy1 - gy0) / CELL) + 1;

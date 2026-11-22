@@ -630,7 +630,7 @@ function drawInterp() {
     const mod = Interp.fit(pts, { scale: def.scale, kind });
     if (!mod) return toast("No hay estaciones suficientes para interpolar.");
     interpLayer && map.removeLayer(interpLayer);
-    interpLayer = new Interp.Layer(mod, RINGS, { opacity: 0.62 }).addTo(map);
+    interpLayer = new Interp.Layer(mod, RINGS, { opacity: 0.62, unit: def.unit, dec: def.scale === "wind" || def.scale === "hum" ? 0 : 1 }).addTo(map);
     interpNote(mod.trend ? `Krigeado con altitud: ${mod.note}` : "");
     console.info(`krigeado: ${mod.n} puntos en ${Math.round(performance.now() - t0)} ms${mod.trend ? " · " + mod.note : ""}`);
   }, 30));
