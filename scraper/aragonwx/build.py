@@ -352,6 +352,17 @@ def main():
             dump_json(out / "webcams.json", {"generated": iso(now), "cams": cams + d})
             state["webcams_ts"] = now
 
+    # ---- récords de cada estación (una vez al día o tras cerrar un día)
+    if closed or state.get("records_day") != today or not (out / "records.json").exists():
+        try:
+            from . import records
+            rec = records.compute(a.history_dir)
+            dump_json(out / "records.json", {"generated": iso(now), "stations": rec})
+            state["records_day"] = today
+            log(f"  Récords: {len(rec)} estaciones")
+        except Exception as e:
+            log(f"  Récords: ERROR {type(e).__name__}: {e}")
+
     # ---- avisos de AEMET (cada 30 min; si fallan se conservan los anteriores)
     key = __import__("os").environ.get("AEMET_API_KEY")
     if key and (not only or "AEMET" in only) and (now - state.get("avisos_ts", 0) > 1800 or not (out / "avisos.json").exists()):

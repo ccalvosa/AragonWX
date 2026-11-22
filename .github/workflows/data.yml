@@ -50,7 +50,7 @@ jobs:
         run: |
           mkdir -p out
           if git fetch --depth=1 origin data 2>/dev/null; then
-            for f in now.json obs10.json hydro.json webcams.json state.json qc.json health.json avisos.json; do
+            for f in now.json obs10.json hydro.json webcams.json state.json qc.json health.json avisos.json records.json; do
               git show FETCH_HEAD:$f > out/$f 2>/dev/null || rm -f out/$f
             done
           fi
@@ -69,7 +69,7 @@ jobs:
           publish() {
             rm -rf pub && mkdir pub
             cp out/now.json out/state.json pub/
-            for f in obs10.json hydro.json webcams.json qc.json health.json avisos.json; do [ -f out/$f ] && cp out/$f pub/; done
+            for f in obs10.json hydro.json webcams.json qc.json health.json avisos.json records.json; do [ -f out/$f ] && cp out/$f pub/; done
             (
               cd pub
               git init -q
