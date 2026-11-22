@@ -9,11 +9,14 @@ SAIH Ebro: todo por su API JSON pública (sin Selenium).
 Las temperaturas solo dan el valor actual: la máxima y la mínima del día las
 calcula el orquestador con las lecturas de cada pasada (estado persistente).
 
-saihebro.com no acepta conexiones desde las máquinas de GitHub Actions. Por eso,
-si la descarga directa falla, se usan los datos crudos que publica un relé en la
-rama «saih» (python -m aragonwx.saih_relay --push, en cualquier máquina que sí
-llegue al SAIH). Si ninguna de las dos vías da datos frescos, el SAIH se queda sin
-datos en esa pasada.
+saihebro.com no acepta conexiones desde las máquinas de GitHub Actions. Se prueba,
+por este orden:
+  1. conexión directa;
+  2. el Worker de Cloudflare de cloudflare/saih-proxy.js (secretos SAIH_PROXY_URL
+     y SAIH_PROXY_TOKEN);
+  3. los datos crudos que publica un relé en la rama «saih»
+     (python -m aragonwx.saih_relay --push, en una máquina que sí llegue al SAIH).
+Si ninguna vía da datos frescos, el SAIH se queda sin datos en esa pasada.
 """
 
 import os
@@ -47,25 +50,33 @@ def _ts(s):
         return None
 
 
-def reachable():
+def _session(headers=None):
+    s = session()
+    s.headers.update(headers or {})
+    return s
+
+
+def reachable(base=BASE, headers=None, label="SAIH"):
     """Una petición rápida para no esperar 56 timeouts si el SAIH no responde."""
     try:
-        r = session().get(f"{BASE}/api/mapa/getDatosMapa", params={"slug": f"mapa-embalses-{ZONES[2]}"},
-                          timeout=TIMEOUT, verify=False)
+        r = _session(headers).get(f"{base}/api/mapa/getDatosMapa", params={"slug": f"mapa-embalses-{ZONES[2]}"},
+                                  timeout=TIMEOUT, verify=False)
+        if not r.ok:
+            log(f"  {label}: HTTP {r.status_code}")
         return r.ok
     except Exception as e:
-        log(f"  SAIH no responde ({type(e).__name__})")
+        log(f"  {label} no responde ({type(e).__name__})")
         return False
 
 
-def fetch_maps():
+def fetch_maps(base=BASE, headers=None):
     """{tag: [tipo_señal, valor, ts, codigo_estacion, nombre]}."""
-    s = session()
+    s = _session(headers)
     jobs = [(k, z) for k in KINDS for z in ZONES]
 
     def one(job):
         k, z = job
-        r = s.get(f"{BASE}/api/mapa/getDatosMapa", params={"slug": f"mapa-{k}-{z}"}, timeout=TIMEOUT, verify=False)
+        r = s.get(f"{base}/api/mapa/getDatosMapa", params={"slug": f"mapa-{k}-{z}"}, timeout=TIMEOUT, verify=False)
         r.raise_for_status()
         return r.json().get("DATOS", [])
 
@@ -85,10 +96,10 @@ def fetch_maps():
     return tags
 
 
-def fetch_pluvio():
-    s = session()
+def fetch_pluvio(base=BASE, headers=None):
+    s = _session(headers)
     try:
-        r = s.get(f"{BASE}/api/pluviometrias/getTablaPluviometrias", timeout=TIMEOUT, verify=False)
+        r = s.get(f"{base}/api/pluviometrias/getTablaPluviometrias", timeout=TIMEOUT, verify=False)
         r.raise_for_status()
         rows = r.json()
     except Exception as e:
@@ -106,14 +117,24 @@ def fetch_pluvio():
     return out
 
 
-def download_raw():
-    """Descarga directa: {'ts', 'tags', 'pluvio'} o None si el SAIH no responde."""
-    if not reachable():
+def download_raw(base=BASE, headers=None, label="SAIH"):
+    """{'ts', 'tags', 'pluvio'} o None si el SAIH (o el proxy) no responde."""
+    if not reachable(base, headers, label):
         return None
-    tags, pluvio = fetch_maps(), fetch_pluvio()
+    tags, pluvio = fetch_maps(base, headers), fetch_pluvio(base, headers)
     if not tags and not pluvio:
         return None
     return {"ts": int(time.time()), "tags": tags, "pluvio": pluvio}
+
+
+def from_proxy():
+    url = os.environ.get("SAIH_PROXY_URL", "").rstrip("/")
+    if not url:
+        return None
+    raw = download_raw(url, {"X-Proxy-Token": os.environ.get("SAIH_PROXY_TOKEN", "")}, "SAIH vía Cloudflare")
+    if raw:
+        log("  SAIH: datos vía Cloudflare")
+    return raw
 
 
 def from_relay():
@@ -134,7 +155,7 @@ def from_relay():
 
 
 def fetch(stations, ctx):
-    raw = download_raw() or from_relay()
+    raw = download_raw() or from_proxy() or from_relay()
     if not raw:
         ctx["saih_tags"] = {}
         return {}

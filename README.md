@@ -89,10 +89,23 @@ No se usa Selenium: una pasada completa tarda unos 20 segundos.
    `estacioneszgz.meteozgz.eu`. En el DNS de meteozgz.eu, crear un `CNAME` de
    `estacioneszgz` a `ccalvosa.github.io`.
 
-## Relé del SAIH
+## SAIH desde GitHub Actions
 
-saihebro.com no acepta conexiones desde GitHub Actions. El workflow lo intenta y,
-si no responde en 6 s, usa los datos crudos de la rama `saih`. Esa rama la publica
+saihebro.com no acepta conexiones desde GitHub Actions. El workflow lo intenta
+directamente y, si no responde en 6 s, prueba estas alternativas por orden.
+
+**1. Worker de Cloudflare** (`cloudflare/saih-proxy.js`):
+
+1. En el panel de Cloudflare: Workers & Pages → Create → Worker. Pegar el fichero y
+   desplegar.
+2. En el Worker: Settings → Variables and Secrets → secreto `PROXY_TOKEN` (una cadena
+   larga aleatoria).
+3. Comprobar que responde:
+   `curl -H "X-Proxy-Token: <token>" https://<worker>.workers.dev/api/pluviometrias/getTablaPluviometrias`
+4. En GitHub, crear los repository secrets `SAIH_PROXY_URL` (`https://<worker>.workers.dev`)
+   y `SAIH_PROXY_TOKEN`. Relanzar el workflow.
+
+**2. Relé** (si el SAIH también bloquea a Cloudflare): datos crudos de la rama `saih`. Esa rama la publica
 `aragonwx.saih_relay`, que corre en cualquier máquina que llegue al SAIH y pueda
 hacer push al repo:
 
