@@ -200,6 +200,8 @@ select:disabled { opacity: 0.5; cursor: default; }
 .check { display: flex; align-items: center; gap: 0.5rem; font-size: 0.84rem; cursor: pointer; padding: 0.18rem 0; }
 .check input { accent-color: var(--accent); width: 15px; height: 15px; flex: none; }
 .field { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.74rem; color: var(--muted); font-weight: 600; margin-bottom: 0.45rem; }
+.mt-s { margin-top: 0.4rem; }
+kbd { font-family: var(--font-mono); font-size: 0.7em; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 0.3em; margin-left: 0.3em; color: var(--muted); }
 .hint { color: var(--muted); font-size: 0.76rem; margin-top: 0.3rem; }
 .tag { font-size: 0.74rem; background: var(--card-2); border-radius: 99px; padding: 0.12rem 0.55rem; color: var(--fg); }
 

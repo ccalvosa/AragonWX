@@ -26,11 +26,13 @@ const PREF_KEY = "aragonwx-prefs";
 const S = {
   mode: "now", v: "ta", hv: "x_max", filter: "all", official: false, doubtful: false, cluster: true,
   netsOff: new Set(), base: "auto", layers: { prov: true }, sat: "ir",
-  sel: null, side: null, anim: null, ftab: "obs", wide: false,
+  sel: null, side: null, anim: null, ftab: "obs", wide: false, aemetAr: false,
+  hidden: new Set(),   // estaciones ocultadas con Supr (solo en este navegador)
 };
 try {
   const p = JSON.parse(localStorage.getItem(PREF_KEY) || "{}");
-  for (const k of ["v", "hv", "filter", "official", "doubtful", "cluster", "base", "sat", "ftab", "wide"]) if (p[k] != null) S[k] = p[k];
+  for (const k of ["v", "hv", "filter", "official", "doubtful", "cluster", "base", "sat", "ftab", "wide", "aemetAr"]) if (p[k] != null) S[k] = p[k];
+  if (p.hidden) S.hidden = new Set(p.hidden);
   if (p.netsOff) S.netsOff = new Set(p.netsOff);
   if (p.layers) S.layers = { ...S.layers, ...p.layers, radar: false, sat: false, li: false, interp: false, arome: false };
 } catch {}
@@ -39,7 +41,7 @@ function savePrefs() {
   try {
     localStorage.setItem(PREF_KEY, JSON.stringify({
       v: S.v, hv: S.hv, filter: S.filter, official: S.official, doubtful: S.doubtful, cluster: S.cluster,
-      netsOff: [...S.netsOff], base: S.base, ftab: S.ftab, wide: S.wide, layers: { prov: S.layers.prov, cams: S.layers.cams, manual: S.layers.manual }, sat: S.sat,
+      netsOff: [...S.netsOff], base: S.base, ftab: S.ftab, wide: S.wide, aemetAr: S.aemetAr, hidden: [...S.hidden], layers: { prov: S.layers.prov, cams: S.layers.cams, manual: S.layers.manual }, sat: S.sat,
     }));
   } catch {}
 }
@@ -188,6 +190,8 @@ function buildControls() {
   $("#only-official").addEventListener("change", e => { S.official = e.target.checked; savePrefs(); render(); });
   $("#show-doubtful").checked = S.doubtful;
   $("#show-doubtful").addEventListener("change", e => { S.doubtful = e.target.checked; savePrefs(); render(); });
+  $("#aemet-ar").checked = S.aemetAr;
+  $("#aemet-ar").addEventListener("change", e => { S.aemetAr = e.target.checked; savePrefs(); render(); });
   $("#cluster").checked = S.cluster;
   $("#cluster").addEventListener("change", e => { S.cluster = e.target.checked; savePrefs(); render(); });
   $("#nets-all").addEventListener("click", () => {
@@ -345,11 +349,42 @@ function valueOf(s, v) {
 }
 
 function stationVisible(s, def, val) {
-  if (s.st === "na" || S.netsOff.has(s.src)) return false;
+  if (s.st === "na" || S.netsOff.has(s.src) || S.hidden.has(s.id)) return false;
+  if (S.aemetAr && s.src === "AEMET" && !inAragon(s)) return false;
   if (S.official && !SOURCES[s.src]?.official) return false;
   if (val == null) return false;
   if (def.q != null && s.q && s.q[def.q] === "D" && !S.doubtful) return false;
   return passFilter(val);
+}
+
+/* ---------- estaciones ocultadas a mano (Supr) */
+function hideStation(id) {
+  const s = BYID.get(id);
+  S.hidden.add(id); savePrefs();
+  closeSide(); render(); updateHiddenInfo();
+  toast(`«${s?.name || id}» oculta en este navegador. Puedes volver a mostrarla en Filtro.`);
+}
+function updateHiddenInfo() {
+  const el = $("#hidden-info");
+  if (!S.hidden.size) { el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = `${S.hidden.size} ${S.hidden.size === 1 ? "estación oculta" : "estaciones ocultas"} a mano · <button class="link-btn small" id="unhide">volver a mostrar</button>`;
+  $("#unhide").addEventListener("click", () => { S.hidden.clear(); savePrefs(); render(); updateHiddenInfo(); });
+}
+
+/* ---------- ¿está la estación dentro de Aragón? (polígono provincial) */
+function inAragon(s) {
+  if (s._ar != null) return s._ar;
+  if (s.prov) return (s._ar = true);   // las del CSV traen provincia
+  if (!RINGS) return true;
+  let inside = false;
+  for (const ring of RINGS) {
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i], [xj, yj] = ring[j];
+      if ((yi > s.lat) !== (yj > s.lat) && s.lon < (xj - xi) * (s.lat - yi) / (yj - yi) + xi) inside = !inside;
+    }
+  }
+  return (s._ar = inside);
 }
 
 function visibleStations() {
@@ -735,7 +770,8 @@ function showObs10Frame(k) {
   stationsLayer = L.layerGroup();
   const view = map.getBounds().pad(0.15);
   for (const [id, d] of Object.entries(OBS10.data)) {
-    const m = OBS10.meta[id]; if (!m || !view.contains([m[1], m[2]])) continue;
+    const m = OBS10.meta[id]; if (!m || !view.contains([m[1], m[2]]) || S.hidden.has(id)) continue;
+    if (S.aemetAr && !inAragon(BYID.get(id) || { lat: m[1], lon: m[2] })) continue;
     const v = obs10Value(d, S.v, k);
     if (v == null || !passFilter(v)) continue;
     const c = colorFor(def.scale, v);
@@ -817,11 +853,13 @@ function openStation(id, fly = true) {
     <div class="side-actions">
       ${st.link ? `<a class="btn" href="${esc(st.link)}" target="_blank" rel="noopener">Ver en ${esc(src.name)} ↗</a>` : ""}
       <button class="btn ghost" id="btn-share">Copiar enlace</button>
+      <button class="btn ghost" id="btn-hide" title="Ocultar esta estación del mapa en este navegador (tecla Supr)">Ocultar <kbd>Supr</kbd></button>
     </div>`;
   openSide("station", html);
   $("#btn-share").addEventListener("click", () => {
     navigator.clipboard?.writeText(location.href).then(() => toast("Enlace copiado."));
   });
+  $("#btn-hide").addEventListener("click", () => hideStation(id));
   setupForecast({ lat: st.lat, lon: st.lon, alt: st.alt, id, st });
   if (st.src === "AEMET") {
     $("#chart-title").textContent = "Cargando las últimas 24 horas…";
@@ -1143,6 +1181,8 @@ function setupSearch() {
   document.addEventListener("keydown", e => {
     if (e.key === "/" && document.activeElement !== inp && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); inp.focus(); }
     if (e.key === "Escape" && S.side) closeSide();
+    if ((e.key === "Delete" || e.key === "Backspace") && S.side === "station" && S.sel
+        && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); hideStation(S.sel); }
   });
 }
 
@@ -1166,6 +1206,7 @@ function setupSearch() {
   await loadStatic().catch(e => console.warn(e));
   await loadNow(true);
   $("#loading").classList.add("done");
+  updateHiddenInfo();
   if (S.sel) openStation(S.sel);
   else if (startPoint) { map.setView(startPoint, 10); openPoint(...startPoint); }
   for (const k of ["cams", "manual"]) if (S.layers[k]) toggleLayer(k);
