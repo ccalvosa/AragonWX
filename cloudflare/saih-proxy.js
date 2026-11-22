@@ -26,7 +26,7 @@ export default {
     let upstream;
     try {
       upstream = await fetch(UPSTREAM + url.pathname + url.search, {
-      headers: { "User-Agent": "AragonWX (+https://github.com/ccalvosa/AragonWX)", Accept: "application/json" },
+        headers: { "User-Agent": "AragonWX (+https://github.com/ccalvosa/AragonWX)", Accept: "application/json" },
         cf: { cacheTtl: 60, cacheEverything: true },
       });
     } catch (e) {
