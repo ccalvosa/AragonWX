@@ -34,6 +34,13 @@ descarga los datos cada 10 minutos y los publica en la rama `data`.
   ahora), ríos en aviso, reserva de los embalses y avisos. Excluye estaciones dudosas u
   ocultas. Se puede filtrar a solo AEMET y SAIH y descargar como imagen (1080×1350) para
   redes sociales.
+- **Récords de cada estación** en su ficha: máxima y mínima más altas y más bajas, lluvia
+  en un día y racha, con su fecha. Para AEMET, de su serie oficial completa
+  (aemet-explorer); para el resto, de `history/` filtrado de errores (`records.py`).
+  «¡Récord hoy!» si el valor del día ya lo supera.
+- **App instalable** (PWA: `manifest.webmanifest`, `sw.js`): en el móvil, «Añadir a
+  pantalla de inicio». El código se pide siempre a la red primero (sin versiones viejas)
+  y la web abre sin conexión; los datos nunca se guardan.
 - **Animación** de las últimas 24 h de AEMET cada 10 minutos (estaciones de la zona visible).
 - **Ranking** de las estaciones de la zona visible del mapa (Aragón, una comarca o toda España).
 - **Capas**: interpolación por krigeado recortada a Aragón, radar (RainViewer),

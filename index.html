@@ -11,6 +11,11 @@
 <script>
   try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
 </script>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Estaciones">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -192,7 +197,7 @@
 <script src="js/scales.js?v=3"></script>
 <script src="js/kriging.js?v=1"></script>
 <script src="js/forecast.js?v=2"></script>
-<script src="js/app.js?v=13"></script>
+<script src="js/app.js?v=14"></script>
 <script src="js/arome.js?v=5"></script>
 <script src="js/aemethist.js?v=2"></script>
 <script src="js/avisos.js?v=2"></script>

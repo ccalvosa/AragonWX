@@ -1293,6 +1293,9 @@ function setupSearch() {
 }
 
 /* ---------------------------------------------------------- arranque */
+// app instalable: service worker (código con red primero; los datos no se guardan)
+if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(e => console.warn("SW", e)));
+
 (async function init() {
   if (innerWidth < 820) map.fitBounds(ZONES["Aragón"], { padding: [4, 4] });
   setBase(S.base);
