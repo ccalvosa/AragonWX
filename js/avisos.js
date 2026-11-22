@@ -43,7 +43,7 @@ const Avisos = (() => {
     layer = null;
     if (!S.layers.avisos || !D) return;
     layer = L.layerGroup();
-    for (const g of zones(D.avisos).sort((a, b) => a.lv - b.lv)) {
+    for (const g of zones(D.avisos.filter(a => a.ar || !S.avisosAr)).sort((a, b) => a.lv - b.lv)) {
       const c = COL[g.level];
       for (const ring of g.poly) {
         L.polygon(ring, { pane: "avisos", color: c, weight: g.active ? 2 : 1.3, dashArray: g.active ? null : "5 4",
@@ -85,7 +85,7 @@ const Avisos = (() => {
   async function openPanel(zone) {
     await load();
     const list = D?.avisos || [];
-    const ar = list.filter(a => a.ar), rest = list.filter(a => !a.ar);
+    const ar = list.filter(a => a.ar), rest = S.avisosAr ? [] : list.filter(a => !a.ar);
     const sel = zone ? list.filter(a => a.zone === zone) : null;
     openSide("avisos", `<div class="eyebrow"><span class="src-dot" style="--c:#e8590c"></span>AEMET · Meteoalerta</div>
       <h2 class="st-name">Avisos meteorológicos</h2>

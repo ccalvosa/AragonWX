@@ -26,12 +26,12 @@ const PREF_KEY = "aragonwx-prefs";
 const S = {
   mode: "now", v: "ta", hv: "x_max", filter: "all", official: false, doubtful: false, cluster: true,
   netsOff: new Set(), base: "auto", layers: { prov: true, avisos: true }, sat: "ir",
-  sel: null, side: null, anim: null, ftab: "obs", wide: false, aemetAr: false,
+  sel: null, side: null, anim: null, ftab: "obs", wide: false, aemetAr: false, avisosAr: false,
   hidden: new Set(),   // estaciones ocultadas con Supr (solo en este navegador)
 };
 try {
   const p = JSON.parse(localStorage.getItem(PREF_KEY) || "{}");
-  for (const k of ["v", "hv", "filter", "official", "doubtful", "cluster", "base", "sat", "ftab", "wide", "aemetAr"]) if (p[k] != null) S[k] = p[k];
+  for (const k of ["v", "hv", "filter", "official", "doubtful", "cluster", "base", "sat", "ftab", "wide", "aemetAr", "avisosAr"]) if (p[k] != null) S[k] = p[k];
   if (p.hidden) S.hidden = new Set(p.hidden);
   if (p.netsOff) S.netsOff = new Set(p.netsOff);
   if (p.layers) S.layers = { ...S.layers, ...p.layers, radar: false, sat: false, li: false, interp: false, arome: false };
@@ -41,7 +41,7 @@ function savePrefs() {
   try {
     localStorage.setItem(PREF_KEY, JSON.stringify({
       v: S.v, hv: S.hv, filter: S.filter, official: S.official, doubtful: S.doubtful, cluster: S.cluster,
-      netsOff: [...S.netsOff], base: S.base, ftab: S.ftab, wide: S.wide, aemetAr: S.aemetAr, hidden: [...S.hidden], layers: { prov: S.layers.prov, cams: S.layers.cams, manual: S.layers.manual, avisos: S.layers.avisos }, sat: S.sat,
+      netsOff: [...S.netsOff], base: S.base, ftab: S.ftab, wide: S.wide, aemetAr: S.aemetAr, avisosAr: S.avisosAr, hidden: [...S.hidden], layers: { prov: S.layers.prov, cams: S.layers.cams, manual: S.layers.manual, avisos: S.layers.avisos }, sat: S.sat,
     }));
   } catch {}
 }
@@ -191,6 +191,8 @@ function buildControls() {
   $("#only-official").addEventListener("change", e => { S.official = e.target.checked; savePrefs(); render(); });
   $("#show-doubtful").checked = S.doubtful;
   $("#show-doubtful").addEventListener("change", e => { S.doubtful = e.target.checked; savePrefs(); render(); });
+  $("#avisos-ar").checked = S.avisosAr;
+  $("#avisos-ar").addEventListener("change", e => { S.avisosAr = e.target.checked; savePrefs(); if (typeof Avisos !== "undefined") Avisos.draw(); });
   $("#aemet-ar").checked = S.aemetAr;
   $("#aemet-ar").addEventListener("change", e => { S.aemetAr = e.target.checked; savePrefs(); render(); });
   $("#cluster").checked = S.cluster;
