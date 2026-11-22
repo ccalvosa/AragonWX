@@ -12,6 +12,7 @@ caducado. Las zonas de Aragón tienen el código 62xxxx.
 import io
 import re
 import tarfile
+import time
 from datetime import datetime
 
 from ..common import log, session
@@ -34,14 +35,28 @@ def _param(block, name):
     return m.group(1).strip() if m else None
 
 
+def _request(s, url, **kw):
+    """GET con reintentos si AEMET responde 429 (límite de peticiones por clave)."""
+    for k in range(4):
+        r = s.get(url, timeout=kw.get("timeout", 60), params=kw.get("params"))
+        if r.status_code != 429:
+            r.raise_for_status()
+            return r
+        wait = 15 * 2 ** k
+        log(f"  Avisos AEMET: límite de peticiones (429); reintento en {wait} s")
+        time.sleep(wait)
+    r.raise_for_status()
+    return r
+
+
 def fetch(api_key, now):
     s = session()
-    r = s.get(URL, params={"api_key": api_key}, timeout=60)
-    r.raise_for_status()
+    time.sleep(5)   # separa esta llamada de las de observación, que se acaban de hacer
+    r = _request(s, URL, params={"api_key": api_key})
     datos = r.json().get("datos")
     if not datos:
         raise RuntimeError(r.json().get("descripcion", "sin datos"))
-    tar = tarfile.open(fileobj=io.BytesIO(s.get(datos, timeout=120).content))
+    tar = tarfile.open(fileobj=io.BytesIO(_request(s, datos, timeout=120).content))
     out, seen = [], set()
     for m in tar.getmembers():
         if not m.isfile():
