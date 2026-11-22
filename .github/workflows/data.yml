@@ -1,0 +1,108 @@
+name: update-data
+
+# Descarga todas las fuentes cada 10 minutos y publica los JSON en la rama «data».
+#
+# El cron de GitHub en repos gratuitos llega con mucho retraso, así que cada
+# ejecución trabaja en bucle ~5,5 h (una pasada cada 10 min) y al terminar se
+# relanza a sí misma con workflow_dispatch. El cron queda como red de seguridad
+# por si la cadena se corta; el grupo de concurrencia evita dos bucles a la vez.
+#
+# La rama «data» tiene siempre un único commit (push forzado) para no engordar
+# el historial. La web lee https://raw.githubusercontent.com/<repo>/data/*.json
+# Al cambiar de día, el histórico diario (history/AAAA-MM.json) se guarda con un
+# commit normal en main.
+
+on:
+  schedule:
+    - cron: "7 */2 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      LOOP_MINUTES: 330
+      EVERY: 600
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scraper/requirements.txt
+
+      - run: pip install -r scraper/requirements.txt
+
+      - name: Recuperar el estado de la pasada anterior
+        run: |
+          mkdir -p out
+          if git fetch --depth=1 origin data 2>/dev/null; then
+            for f in now.json obs10.json hydro.json webcams.json state.json; do
+              git show FETCH_HEAD:$f > out/$f 2>/dev/null || rm -f out/$f
+            done
+          fi
+          ls -la out
+
+      - name: Bucle de descarga y publicación
+        env:
+          AEMET_API_KEY: ${{ secrets.AEMET_API_KEY }}
+          WU_API_KEY: ${{ secrets.WU_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global user.name "aragonwx-bot"
+          git config --global user.email "actions@users.noreply.github.com"
+          publish() {
+            rm -rf pub && mkdir pub
+            cp out/now.json out/state.json pub/
+            for f in obs10.json hydro.json webcams.json; do [ -f out/$f ] && cp out/$f pub/; done
+            (
+              cd pub
+              git init -q
+              git checkout -q -b data
+              git add .
+              git commit -q -m "data: $(date -u +%FT%TZ) [bot]"
+              git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data
+            )
+          }
+          save_history() {
+            # el día anterior se ha cerrado: commit normal en main con history/
+            git add history
+            git diff --cached --quiet && return 0
+            git commit -q -m "history: cierre de $(sed -n 's#.*/##p' out/closed_days.txt | tr '\n' ' ')[bot]"
+            for i in 1 2 3; do
+              git pull -q --rebase origin "${GITHUB_REF_NAME}" && git push -q origin "HEAD:${GITHUB_REF_NAME}" && break
+              sleep 10
+            done
+            rm -f out/closed_days.txt
+          }
+          end=$(( $(date +%s) + LOOP_MINUTES * 60 ))
+          while :; do
+            start=$(date +%s)
+            echo "::group::$(date -u +%FT%TZ)"
+            (cd scraper && python -m aragonwx.build --out ../out --history-dir ../history) \
+              || echo "::warning::la pasada ha fallado"
+            [ -f out/closed_days.txt ] && { save_history || echo "::warning::no se pudo guardar el histórico"; }
+            [ -f out/now.json ] && { publish || echo "::warning::no se pudo publicar"; }
+            echo "::endgroup::"
+            now=$(date +%s)
+            [ $(( now + EVERY )) -lt $end ] || break
+            sleep $(( EVERY - (now - start) > 0 ? EVERY - (now - start) : 1 ))
+          done
+
+      - name: Relanzar la cadena
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run data.yml --ref "${GITHUB_REF_NAME}" -R "${GITHUB_REPOSITORY}"

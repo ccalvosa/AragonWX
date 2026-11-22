@@ -1,0 +1,126 @@
+id,name,lat,lon,warn_yellow,warn_orange,warn_red,since,record_date,record_level_m,record_flow_m3s,link
+A010,JILOCA DAROCA,41.10633,-1.41942,1.0,1.5,2.0,1997,01/09/2021,1.91,68.83,https://www.saihebro.com/tiempo-real/mapa-aforos-H10-bajo-jalon
+A042,JILOCA-CALAMOCHA,40.92408,-1.30059,1.0,1.5,2.0,1997,09/08/2009,1.98,33.89,https://www.saihebro.com/tiempo-real/mapa-aforos-H10-bajo-jalon
+A055,JILOCA-MORATA,41.25162,-1.58458,1.2,1.6,2.0,1997,19/09/2022,1.79,68.83,https://www.saihebro.com/tiempo-real/mapa-aforos-H10-bajo-jalon
+A087,JALÓN-GRISÉN,41.73291,-1.17572,2.0,2.6,3.2,1997,25/01/1997,3.34,119.33,https://www.saihebro.com/tiempo-real/mapa-aforos-H10-bajo-jalon
+A236,ARANDA-COLA MAIDEVERA,41.57869,-1.77895,,,,1997,26/02/2003,1.25,10.83,https://www.saihebro.com/tiempo-real/mapa-aforos-H10-bajo-jalon
+A238,ARANDA-MAIDEVERA,41.57009,-1.75738,,,,2004,01/04/2015,0.71,4.05,https://www.saihebro.com/tiempo-real/mapa-aforos-H10-bajo-jalon
+A261,ISUELA-TRASOBARES,41.64128,-1.64030,0.9,1.4,1.8,1997,26/02/2003,1.86,69.84,https://www.saihebro.com/tiempo-real/mapa-aforos-H10-bajo-jalon
+A266,JALÓN-CALATAYUD,41.35486,-1.63312,1.5,2.0,2.5,1997,27/02/2003,3.11,86.43,https://www.saihebro.com/tiempo-real/mapa-aforos-H10-bajo-jalon
+A278,JALÓN-CHODES,41.49445,-1.46125,1.0,1.4,1.8,2000,25/03/2015,2.85,80.25,https://www.saihebro.com/tiempo-real/mapa-aforos-H10-bajo-jalon
+A294,PEDREÑAS-MAIDEVERA,41.59604,-1.77310,,,,2005,24/03/2015,1.05,10.20,https://www.saihebro.com/tiempo-real/mapa-aforos-H10-bajo-jalon
+A295,COSUENDA-COSUENDA,41.37065,-1.29821,,,,ND,ND,,,https://www.saihebro.com/tiempo-real/mapa-aforos-H10-bajo-jalon
+A296,AGUARÓN-AGUARÓN,41.33900,-1.27179,,,,ND,ND,,,https://www.saihebro.com/tiempo-real/mapa-aforos-H10-bajo-jalon
+A347,ARANDA-ARÁNDIGA,41.50796,-1.46479,,,,ND,ND,,,https://www.saihebro.com/tiempo-real/mapa-aforos-H10-bajo-jalon
+A363,JILOCA-CALATAYUD,41.33951,-1.65505,,,,ND,ND,,,https://www.saihebro.com/tiempo-real/mapa-aforos-H10-bajo-jalon
+A367,GRIO-COLA MULARROYA,41.41628,-1.44902,,,,ND,ND,,,https://www.saihebro.com/tiempo-real/mapa-aforos-H10-bajo-jalon
+A390,JALÓN-EMBID RIBERA,41.40199,-1.60990,,,,ND,ND,,,https://www.saihebro.com/tiempo-real/mapa-aforos-H10-bajo-jalon
+A393,JILOCA-VILLARQUEMADO,40.52454,-1.29539,,,,ND,ND,,,https://www.saihebro.com/tiempo-real/mapa-aforos-H10-bajo-jalon
+A018,ARAGÓN-JACA,42.57849,-0.55433,2.0,2.5,3.0,1997,20/10/2012,3.40,363.00,https://www.saihebro.com/tiempo-real/mapa-aforos-H16-alto-aragon
+A061,JAVIERREGAY,42.57684,-0.75446,1.7,2.0,2.3,1997,30/10/2023,2.28,235.80,https://www.saihebro.com/tiempo-real/mapa-aforos-H16-alto-aragon
+A062,VERAL-BINIÉS,42.65583,-0.78605,1.7,2.2,2.7,1997,16/07/1997,2.15,101.50,https://www.saihebro.com/tiempo-real/mapa-aforos-H16-alto-aragon
+A063,ESCA-SIGÜÉS,42.64496,-1.01220,2.8,3.3,3.8,1997,13/12/2019,4.15,300.50,https://www.saihebro.com/tiempo-real/mapa-aforos-H16-alto-aragon
+A080,VERAL ZURIZA,42.86262,-0.82030,1.2,1.5,1.8,1997,19/10/2001,1.75,86.83,https://www.saihebro.com/tiempo-real/mapa-aforos-H16-alto-aragon
+A101,ARAGÓN-YESA P.P.,42.61594,-1.21105,1.8,2.1,2.4,1997,06/01/2001,2.79,721.68,https://www.saihebro.com/tiempo-real/mapa-aforos-H16-alto-aragon
+A268,ESCA-ISABA,42.85919,-0.92747,2.2,2.6,2.9,1997,13/12/2019,3.19,146.53,https://www.saihebro.com/tiempo-real/mapa-aforos-H16-alto-aragon
+A271,ARAGÓN-CANFRANC,42.71978,-0.52518,1.4,1.8,2.2,1997,23/09/2006,2.53,120.34,https://www.saihebro.com/tiempo-real/mapa-aforos-H16-alto-aragon
+A282,ARAGÓN-MARTES,42.59149,-0.88288,1.4,1.8,2.2,2004,20/10/2012,2.29,1016.04,https://www.saihebro.com/tiempo-real/mapa-aforos-H16-alto-aragon
+A040,ARA-BOLTAÑA,42.43619,0.07827,2.0,3.0,4.0,1997,18/12/1997,3.59,827.80,https://www.saihebro.com/tiempo-real/mapa-aforos-H17-alto-cinca
+A051,CINCA-ESCALONA,42.47802,0.15027,2.9,3.4,3.9,1997,07/09/2024,4.52,831.20,https://www.saihebro.com/tiempo-real/mapa-aforos-H17-alto-cinca
+A171,CINQUETA MOLINO GISTAIN,42.61238,0.34630,1.5,2.0,2.5,ND,ND,,,https://www.saihebro.com/tiempo-real/mapa-aforos-H17-alto-cinca
+A172,CINCA-LAFORTUNADA,42.54270,0.19585,3.0,3.5,4.0,1997,07/09/2024,4.54,508.00,https://www.saihebro.com/tiempo-real/mapa-aforos-H17-alto-cinca
+A257,SUSÍA-ESCANILLA,42.28786,0.19077,,,,1997,21/07/2010,2.10,192.35,https://www.saihebro.com/tiempo-real/mapa-aforos-H17-alto-cinca
+A383,ARA-BROTO,42.60263,-0.12287,2.0,2.7,3.5,ND,ND,,,https://www.saihebro.com/tiempo-real/mapa-aforos-H17-alto-cinca
+A013,ÉSERA-GRAUS,42.20493,0.34540,2.8,4.2,5.0,1997,18/12/1997,4.32,574.80,https://www.saihebro.com/tiempo-real/mapa-aforos-H18-esera
+A047,ISÁBENA-CAPELLA,42.19381,0.39535,1.4,1.7,2.0,1997,18/12/1997,2.97,273.20,https://www.saihebro.com/tiempo-real/mapa-aforos-H18-esera
+A145,ÉSERA-ERISTE,42.57884,0.47140,2.5,3.3,4.0,1997,18/06/2013,4.54,310.40,https://www.saihebro.com/tiempo-real/mapa-aforos-H18-esera
+A258,ÉSERA-CAMPO,42.42358,0.38832,2.0,2.7,3.5,1997,18/06/2013,2.83,460.70,https://www.saihebro.com/tiempo-real/mapa-aforos-H18-esera
+A381,ÉSERA CONGOSTO OLVENA,42.10004,0.24804,,,,ND,ND,,,https://www.saihebro.com/tiempo-real/mapa-aforos-H18-esera
+A105,HUERVA-MEZALOCHA,41.42612,-1.07675,0.8,1.1,1.3,1997,07/05/2003,2.38,92.16,https://www.saihebro.com/tiempo-real/mapa-aforos-H19-huerva-aguas-vivas
+A124,HUERVA-LAS TORCAS,41.29696,-1.08435,1.2,1.4,1.6,1997,07/05/2003,2.96,121.91,https://www.saihebro.com/tiempo-real/mapa-aforos-H19-huerva-aguas-vivas
+A168,MONEVA P.P.,41.18249,-0.83231,0.71,1.0,1.26,1997,23/04/2022,0.52,1.71,https://www.saihebro.com/tiempo-real/mapa-aforos-H19-huerva-aguas-vivas
+A215,HUERVA CERVERUELA,41.21580,-1.21279,1.0,1.6,2.2,1997,02/09/2021,2.06,59.60,https://www.saihebro.com/tiempo-real/mapa-aforos-H19-huerva-aguas-vivas
+A216,HUERVA-ZARAGOZA,41.63706,-0.89788,1.5,2.1,2.7,1997,08/05/2003,4.82,132.08,https://www.saihebro.com/tiempo-real/mapa-aforos-H19-huerva-aguas-vivas
+A263,EBRO-GELSA,41.39812,-0.47616,4.3,4.6,4.9,2004,03/03/2015,5.85,2770.00,https://www.saihebro.com/tiempo-real/mapa-aforos-H19-huerva-aguas-vivas
+A341,EBRO-VILLAFRANCA,41.56046,-0.68007,7.0,7.5,8.0,ND,ND,,,https://www.saihebro.com/tiempo-real/mapa-aforos-H19-huerva-aguas-vivas
+CH16,AZUD ZARAGOZA,41.65259,-0.85704,,,,ND,ND,,,https://www.saihebro.com/tiempo-real/mapa-aforos-H19-huerva-aguas-vivas
+E286,PINA PRESA,41.56953,-0.68958,,,,ND,ND,,,https://www.saihebro.com/tiempo-real/mapa-aforos-H19-huerva-aguas-vivas
+A008,PIEDRA-NUÉVALOS,41.19753,-1.79297,0.6,0.9,1.2,1997,30/10/2024,1.87,95.90,https://www.saihebro.com/tiempo-real/mapa-aforos-H20-alto-jalon
+A056,MESA-JARABA,41.19090,-1.87643,0.4,0.6,0.8,1997,30/10/2024,1.22,18.10,https://www.saihebro.com/tiempo-real/mapa-aforos-H20-alto-jalon
+A057,DEZA-EMBID,41.38649,-1.98415,0.8,1.4,2.0,1997,16/08/2013,2.18,6.40,https://www.saihebro.com/tiempo-real/mapa-aforos-H20-alto-jalon
+A058,JALÓN-JUBERA,41.19660,-2.33843,0.8,1.2,1.6,1997,03/09/2004,1.24,12.84,https://www.saihebro.com/tiempo-real/mapa-aforos-H20-alto-jalon
+A125,PIEDRA-CARENAS,41.26645,-1.79872,0.7,0.9,1.1,1997,04/08/2005,0.81,24.55,https://www.saihebro.com/tiempo-real/mapa-aforos-H20-alto-jalon
+A126,JALÓN-ATECA,41.32295,-1.80065,0.9,1.1,1.3,1997,05/09/2003,1.09,28.16,https://www.saihebro.com/tiempo-real/mapa-aforos-H20-alto-jalon
+A129,ORTIZ-NUÉVALOS,41.20712,-1.77851,0.6,999.0,999.0,1997,29/08/2024,1.34,14.02,https://www.saihebro.com/tiempo-real/mapa-aforos-H20-alto-jalon
+A147,NAJIMA-MONREAL ARIZA,41.30805,-2.11614,,,,ND,ND,,,https://www.saihebro.com/tiempo-real/mapa-aforos-H20-alto-jalon
+A167,BLANCO-B. BLANCO,41.19307,-2.33265,,,,1997,03/09/2004,0.99,6.53,https://www.saihebro.com/tiempo-real/mapa-aforos-H20-alto-jalon
+A184,MANUBLES-ATECA,41.33429,-1.79022,1.0,1.5,2.0,1997,26/02/2003,2.55,100.10,https://www.saihebro.com/tiempo-real/mapa-aforos-H20-alto-jalon
+A287,MANUBLES-BIJUESCA,41.54115,-1.92226,1.2,1.7,2.2,2005,12/04/2018,2.27,28.94,https://www.saihebro.com/tiempo-real/mapa-aforos-H20-alto-jalon
+A288,CARABÁN-CARABANTES,41.55174,-1.99440,,,,2005,27/06/2010,1.89,6.48,https://www.saihebro.com/tiempo-real/mapa-aforos-H20-alto-jalon
+A307,JALÓN-CETINA,41.29849,-1.95689,,,,2006,04/07/2014,2.71,69.82,https://www.saihebro.com/tiempo-real/mapa-aforos-H20-alto-jalon
+A338,SANTED-SANTED,41.02658,-1.51990,,,,ND,ND,,,https://www.saihebro.com/tiempo-real/mapa-aforos-H20-alto-jalon
+A342,MANUBLES-BOROBIA,41.66922,-1.88654,,,,ND,ND,,,https://www.saihebro.com/tiempo-real/mapa-aforos-H20-alto-jalon
+A174,QUEILES-LOS FAYOS,41.88049,-1.78161,0.57,0.65,0.88,1997,20/01/2004,0.80,8.24,https://www.saihebro.com/tiempo-real/mapa-aforos-H21-medio-ebro-md
+A175,QUEILES-TUDELA,42.05947,-1.61707,,,,2006,06/07/2022,2.02,25.76,https://www.saihebro.com/tiempo-real/mapa-aforos-H21-medio-ebro-md
+A285,EBRO - NOVILLAS,41.92971,-1.38611,6.9,7.4,7.9,2004,12/12/2021,8.51,,https://www.saihebro.com/tiempo-real/mapa-aforos-H21-medio-ebro-md
+A292,HUECHA-CORTES,41.92460,-1.41362,1.0,1.6,2.2,2005,03/07/2014,2.36,65.22,https://www.saihebro.com/tiempo-real/mapa-aforos-H21-medio-ebro-md
+A389,VAL-COLA EMBALSE VAL,41.87796,-1.83720,,,,ND,ND,,,https://www.saihebro.com/tiempo-real/mapa-aforos-H21-medio-ebro-md
+A002,EBRO-CASTEJÓN,42.18008,-1.69474,6.0,6.5,7.0,1997,11/12/2021,7.96,3000.00,https://www.saihebro.com/tiempo-real/mapa-aforos-H4-medio-ebro-mi
+A011,EBRO-ZARAGOZA,41.65857,-0.88107,4.0,4.5,5.0,1997,02/03/2015,6.10,2448.00,https://www.saihebro.com/tiempo-real/mapa-aforos-H4-medio-ebro-mi
+A155,ARBA LUESIA-BIOTA,42.26060,-1.19181,0.9,1.2,1.5,1997,22/10/2000,1.30,48.75,https://www.saihebro.com/tiempo-real/mapa-aforos-H4-medio-ebro-mi
+A186,RIGUEL- SÁDABA,42.28024,-1.27109,1.0,1.6,2.2,1997,04/10/2013,2.21,122.96,https://www.saihebro.com/tiempo-real/mapa-aforos-H4-medio-ebro-mi
+A187,ARBA BIEL-ERLA,42.11621,-0.94606,1.5,2.0,2.5,1997,26/02/2003,2.48,71.32,https://www.saihebro.com/tiempo-real/mapa-aforos-H4-medio-ebro-mi
+A260,ARBA-TAUSTE,41.91296,-1.28009,4.0,6.0,7.5,1997,12/04/2018,7.98,262.47,https://www.saihebro.com/tiempo-real/mapa-aforos-H4-medio-ebro-mi
+A273,RIGUEL- EL SABINAR,42.06187,-1.21499,1.2,1.8,2.4,2006,12/04/2018,3.52,347.73,https://www.saihebro.com/tiempo-real/mapa-aforos-H4-medio-ebro-mi
+A284,EBRO TUDELA,42.06709,-1.60040,3.2,3.7,4.4,2004,12/12/2021,6.18,2758.66,https://www.saihebro.com/tiempo-real/mapa-aforos-H4-medio-ebro-mi
+A286,EBRO - ALAGÓN,41.79109,-1.13692,6.4,6.8,7.2,2004,01/03/2015,7.90,,https://www.saihebro.com/tiempo-real/mapa-aforos-H4-medio-ebro-mi
+A290,ARBA LUESIA - EJEA,42.11743,-1.15096,3.5,5.0,6.0,2005,11/04/2018,6.14,144.88,https://www.saihebro.com/tiempo-real/mapa-aforos-H4-medio-ebro-mi
+A291,LA BARLUENGA,42.08307,-0.92806,1.2,1.7,2.2,2005,11/04/2018,2.44,118.10,https://www.saihebro.com/tiempo-real/mapa-aforos-H4-medio-ebro-mi
+A305,RIGUEL-UNCASTILLO,42.35770,-1.13552,0.5,1.0,1.8,2008,26/05/2018,2.05,,https://www.saihebro.com/tiempo-real/mapa-aforos-H4-medio-ebro-mi
+A311,EBRO ZARAGOZA A-2,41.68190,-0.89958,6.3,7.0,7.5,2010,02/03/2015,9.00,2500.00,https://www.saihebro.com/tiempo-real/mapa-aforos-H4-medio-ebro-mi
+A340,EBRO-PRADILLA,41.85564,-1.25991,7.2,999.0,999.0,ND,ND,,,https://www.saihebro.com/tiempo-real/mapa-aforos-H4-medio-ebro-mi
+A012,GÁLLEGO-ARDISA,42.17467,-0.75262,3.0,3.5,3.9,1997,23/11/2003,5.46,1181.32,https://www.saihebro.com/tiempo-real/mapa-aforos-H5-gallego
+A059,GÁLLEGO-ST EULALIA,42.27126,-0.75102,3.3,3.9,4.5,1997,20/10/2012,5.26,691.25,https://www.saihebro.com/tiempo-real/mapa-aforos-H5-gallego
+A089,GÁLLEGO-ZARAGOZA,41.66931,-0.84188,3.0,4.0,5.0,1997,24/11/2003,3.46,626.13,https://www.saihebro.com/tiempo-real/mapa-aforos-H5-gallego
+A123,GÁLLEGO-ANZÁNIGO,42.40417,-0.65152,2.5,2.9,3.3,1997,20/10/2012,3.80,609.10,https://www.saihebro.com/tiempo-real/mapa-aforos-H5-gallego
+A209,GÁLLEGO-ZUERA,41.82276,-0.78513,2.3,2.8,3.2,2005,21/10/2012,4.44,638.51,https://www.saihebro.com/tiempo-real/mapa-aforos-H5-gallego
+A229,Bco. VIOLADA-ZUERA,41.90059,-0.77359,,,,1997,21/10/2012,1.82,51.00,https://www.saihebro.com/tiempo-real/mapa-aforos-H5-gallego
+A250,GÁLLEGO-BÚBAL,42.67899,-0.31652,2.8,3.6,4.3,1997,19/06/2013,3.66,158.05,https://www.saihebro.com/tiempo-real/mapa-aforos-H5-gallego
+A255,SOTÓN-ORTILLA,42.15323,-0.62342,1.6,999.0,999.0,1997,20/10/2012,3.23,196.46,https://www.saihebro.com/tiempo-real/mapa-aforos-H5-gallego
+A298,ASABÓN-LA PEÑA,42.40928,-0.78804,1.4,2.0,2.6,2008,19/10/2012,2.80,181.76,https://www.saihebro.com/tiempo-real/mapa-aforos-H5-gallego
+A309,GÁLLEGO SALLENT,42.76940,-0.33411,1.3,1.8,2.3,2010,19/10/2012,2.11,68.34,https://www.saihebro.com/tiempo-real/mapa-aforos-H5-gallego
+A310,AGUAS LIMPIAS-SALLENT,42.77508,-0.32784,0.7,1.3,1.8,2010,22/07/2010,0.99,12.56,https://www.saihebro.com/tiempo-real/mapa-aforos-H5-gallego
+A312,BAILÍN SABIÑANIGO,42.48832,-0.37020,,,,2010,04/11/2014,0.95,9.23,https://www.saihebro.com/tiempo-real/mapa-aforos-H5-gallego
+A319,GÁLLEGO SABIÑÁNIGO,42.49000,-0.37355,2.4,3.0,3.5,2010,29/03/2024,3.68,327.76,https://www.saihebro.com/tiempo-real/mapa-aforos-H5-gallego
+A017,CINCA-FRAGA,41.55190,0.32334,3.5,4.1,4.8,1997,19/12/1997,4.79,1442.33,https://www.saihebro.com/tiempo-real/mapa-aforos-H6-bajo-cinca
+A032,GUATIZALEMA,41.90921,-0.12785,1.1,1.5,1.9,1997,27/02/2003,1.71,115.58,https://www.saihebro.com/tiempo-real/mapa-aforos-H6-bajo-cinca
+A033,ALCANADRE-PERALTA,41.91272,-0.12539,3.0,4.1,5.2,1997,18/12/1997,5.92,370.72,https://www.saihebro.com/tiempo-real/mapa-aforos-H6-bajo-cinca
+A091,ALCANADRE-LASCELLAS,42.08742,-0.10967,2.8,3.7,4.6,1997,06/09/2024,5.03,206.26,https://www.saihebro.com/tiempo-real/mapa-aforos-H6-bajo-cinca
+A094,FLUMEN-ALBALATILLO,41.75842,-0.18139,1.4,1.8,2.2,1997,22/10/2012,2.69,146.55,https://www.saihebro.com/tiempo-real/mapa-aforos-H6-bajo-cinca
+A095,VERO-BARBASTRO,42.02903,0.13185,1.5,1.8,2.2,1997,22/09/2006,3.83,465.30,https://www.saihebro.com/tiempo-real/mapa-aforos-H6-bajo-cinca
+A190,FLUMEN-QUICENA,42.14374,-0.34662,,,,1997,26/02/2003,2.00,80.50,https://www.saihebro.com/tiempo-real/mapa-aforos-H6-bajo-cinca
+A191,FLUMEN BARBUÉS,41.98228,-0.42347,2.0,999.0,999.0,1997,21/10/2012,4.00,65.20,https://www.saihebro.com/tiempo-real/mapa-aforos-H6-bajo-cinca
+A192,GUATIZALEMA-SIETAMO,42.12447,-0.26691,1.2,2.6,4.0,1997,26/02/2003,3.57,72.76,https://www.saihebro.com/tiempo-real/mapa-aforos-H6-bajo-cinca
+A193,ALCANADRE-BALLOBAR,41.62039,0.19522,2.2,3.0,4.0,1997,19/12/1997,4.55,707.00,https://www.saihebro.com/tiempo-real/mapa-aforos-H6-bajo-cinca
+A225,CLAMOR AMARGA-ZAIDÍN,41.57717,0.28988,0.9,1.2,1.5,2008,23/01/2020,1.76,47.21,https://www.saihebro.com/tiempo-real/mapa-aforos-H6-bajo-cinca
+A293,CINCA- PUENTE LAS PILAS,42.06668,0.21336,2.8,3.2,3.6,2006,19/06/2013,3.83,929.98,https://www.saihebro.com/tiempo-real/mapa-aforos-H6-bajo-cinca
+A300,SOSA-AZANUY,41.93718,0.30246,,,,2008,07/10/2024,1.38,,https://www.saihebro.com/tiempo-real/mapa-aforos-H6-bajo-cinca
+A301,SOSA MONZÓN,41.91161,0.18874,,,,2009,02/11/2015,1.64,,https://www.saihebro.com/tiempo-real/mapa-aforos-H6-bajo-cinca
+A320,FLUMEN-COLA MONTEARAGÓN,42.23354,-0.37163,1.5,999.0,999.0,2011,10/12/2021,1.29,19.73,https://www.saihebro.com/tiempo-real/mapa-aforos-H6-bajo-cinca
+A052,MATARRAÑA BECEITE,40.82442,0.18552,1.1,1.8,2.4,1997,23/10/2000,4.42,334.11,https://www.saihebro.com/tiempo-real/mapa-aforos-H8-bajo-ebro
+A109,PENA-VALDERROBRES,40.82404,0.13197,1.0,999.0,999.0,1997,25/03/2015,1.04,20.11,https://www.saihebro.com/tiempo-real/mapa-aforos-H8-bajo-ebro
+A110,PENA BECEITE,40.80079,0.12986,1.0,999.0,999.0,1997,23/10/2000,3.02,120.58,https://www.saihebro.com/tiempo-real/mapa-aforos-H8-bajo-ebro
+A113,FIGUERALES,40.80246,0.11792,0.7,999.0,999.0,1997,23/10/2000,1.65,18.00,https://www.saihebro.com/tiempo-real/mapa-aforos-H8-bajo-ebro
+A176,MATARRAÑA-NONASPE,41.19536,0.17153,2.0,999.0,999.0,1997,23/10/2000,3.41,1321.40,https://www.saihebro.com/tiempo-real/mapa-aforos-H8-bajo-ebro
+A297,ULLDEMÓ BECEITE,40.84010,0.19760,1.3,1.8,2.3,2009,21/01/2020,2.25,68.00,https://www.saihebro.com/tiempo-real/mapa-aforos-H8-bajo-ebro
+A014,MARTÍN-HÍJAR,41.17451,-0.45327,1.4,2.2,3.0,1997,04/08/2013,2.60,90.72,https://www.saihebro.com/tiempo-real/mapa-aforos-H9-guadalope-martin
+A099,GUADALOPE-CASPE,41.21048,0.01282,3.0,4.0,5.0,1997,25/03/2015,4.26,437.26,https://www.saihebro.com/tiempo-real/mapa-aforos-H9-guadalope-martin
+A100,GUADALOPILLO-BERGE,40.86189,-0.42273,0.7,1.2,1.7,1997,19/10/2018,2.24,32.46,https://www.saihebro.com/tiempo-real/mapa-aforos-H9-guadalope-martin
+A106,SANTOLEA-P.P.,40.77774,-0.31395,1.0,999.0,999.0,1997,07/05/2003,2.11,130.43,https://www.saihebro.com/tiempo-real/mapa-aforos-H9-guadalope-martin
+A118,MARTÍN-OLIETE,40.99065,-0.69255,0.8,1.1,1.4,1997,17/08/1998,0.70,25.00,https://www.saihebro.com/tiempo-real/mapa-aforos-H9-guadalope-martin
+A127,MARTÍN-ALCAINE,40.95473,-0.70171,1.6,2.1,2.5,1997,19/10/2018,2.73,121.43,https://www.saihebro.com/tiempo-real/mapa-aforos-H9-guadalope-martin
+A201,GUADALOPILLO-GALLIPUEN,40.87636,-0.41307,,,,ND,ND,,,https://www.saihebro.com/tiempo-real/mapa-aforos-H9-guadalope-martin
+A262,SECO-OLIETE,40.99209,-0.69676,1.0,1.5,2.0,1997,03/08/2013,3.08,,https://www.saihebro.com/tiempo-real/mapa-aforos-H9-guadalope-martin
+A350,BORDON-BORDON,40.69440,-0.31985,,,,ND,ND,,,https://www.saihebro.com/tiempo-real/mapa-aforos-H9-guadalope-martin
+A351,PITARQUE-VILLARLUENGO,40.66334,-0.56191,,,,ND,ND,,,https://www.saihebro.com/tiempo-real/mapa-aforos-H9-guadalope-martin
+A352,GUADALOPE-VILLARLUENGO,40.68933,-0.56878,,,,ND,ND,,,https://www.saihebro.com/tiempo-real/mapa-aforos-H9-guadalope-martin

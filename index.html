@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Estaciones de Aragón</title>
+<meta name="description" content="Mapa en directo de más de mil estaciones meteorológicas de Aragón: AEMET (cada 10 minutos), SAIH Ebro, Weather Underground, WeatherCloud, Meteoclimatic y más. Ríos, embalses, radar, satélite y webcams.">
+<meta name="theme-color" content="#f6f4ef" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1116" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3CclipPath id='c'%3E%3Crect width='32' height='32' rx='8'/%3E%3C/clipPath%3E%3Cg clip-path='url(%23c)'%3E%3Crect width='7' height='32' fill='%231c7ed6'/%3E%3Crect x='6.4' width='7' height='32' fill='%2374c0fc'/%3E%3Crect x='12.8' width='7' height='32' fill='%23ffd8a8'/%3E%3Crect x='19.2' width='7' height='32' fill='%23ff8787'/%3E%3Crect x='25.6' width='7' height='32' fill='%23e03131'/%3E%3C/g%3E%3C/svg%3E">
+<script>
+  try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="css/style.css?v=1">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="./" title="Inicio">
+    <svg class="brand-logo" viewBox="0 0 32 32" aria-hidden="true">
+      <clipPath id="logo-clip"><rect width="32" height="32" rx="8"/></clipPath>
+      <g clip-path="url(#logo-clip)">
+        <rect x="0" width="7" height="32" fill="#1c7ed6"/>
+        <rect x="6.4" width="7" height="32" fill="#74c0fc"/>
+        <rect x="12.8" width="7" height="32" fill="#ffd8a8"/>
+        <rect x="19.2" width="7" height="32" fill="#ff8787"/>
+        <rect x="25.6" width="7" height="32" fill="#e03131"/>
+      </g>
+    </svg>
+    <span class="brand-text">Estaciones de Aragón</span>
+    <small>EN DIRECTO</small>
+  </a>
+
+  <div class="search-box top-search">
+    <input type="text" id="search" class="search-input" placeholder="Buscar estación o municipio…  ( / )"
+           autocomplete="off" spellcheck="false" aria-label="Buscar estación">
+    <ul id="search-results" class="search-results" hidden></ul>
+  </div>
+
+  <div class="top-actions">
+    <span class="live-pill" id="live-pill" title="Hora de los datos"><i class="live-dot"></i><span id="updated">Cargando…</span></span>
+    <button id="btn-panel" class="icon-btn only-mobile" title="Controles" aria-label="Mostrar controles">☰</button>
+    <button id="theme-toggle" class="icon-btn" title="Cambiar tema claro / oscuro" aria-label="Cambiar tema">◐</button>
+  </div>
+</header>
+
+<main class="mapapp">
+  <div id="map" aria-label="Mapa de estaciones"></div>
+
+  <!-- ============ PANEL DE CONTROL ============ -->
+  <aside id="controls" class="dock dock-left" aria-label="Controles del mapa">
+    <div class="dock-scroll">
+      <div class="seg seg-mode" id="mode-seg" role="tablist">
+        <button data-mode="now" class="on">Ahora</button>
+        <button data-mode="hist">Histórico</button>
+      </div>
+
+      <section class="ctl" id="ctl-vars">
+        <h3>Variable</h3>
+        <div id="var-groups"></div>
+      </section>
+
+      <section class="ctl" id="ctl-hist" hidden>
+        <h3>Período</h3>
+        <div class="hist-grid">
+          <label class="field">Desde<input type="date" id="h-start"></label>
+          <label class="field">Hasta<input type="date" id="h-end"></label>
+        </div>
+        <div class="chips-row" id="h-quick">
+          <button class="chip" data-q="yesterday">Ayer</button>
+          <button class="chip" data-q="7">7 días</button>
+          <button class="chip" data-q="month">Este mes</button>
+          <button class="chip" data-q="prevmonth">Mes pasado</button>
+          <button class="chip" data-q="year">Este año</button>
+        </div>
+        <label class="field">Variable
+          <select id="h-var">
+            <option value="x_max">Máxima más alta</option>
+            <option value="x_mean">Media de las máximas</option>
+            <option value="n_min">Mínima más baja</option>
+            <option value="n_mean">Media de las mínimas</option>
+            <option value="m_mean">Temperatura media</option>
+            <option value="p_sum">Lluvia acumulada</option>
+            <option value="p_max">Lluvia máxima en un día</option>
+            <option value="p_days">Días de lluvia (≥ 1 mm)</option>
+            <option value="n_frost">Días de helada (mín &lt; 0 °C)</option>
+            <option value="x_hot">Días de calor (máx ≥ 35 °C)</option>
+            <option value="w_max">Racha máxima</option>
+          </select>
+        </label>
+        <label class="check"><input type="checkbox" id="h-incomplete"> Incluir estaciones con huecos</label>
+        <p class="hint" id="h-status"></p>
+      </section>
+
+      <section class="ctl">
+        <h3>Filtro</h3>
+        <select id="filter" aria-label="Filtro por valor"></select>
+        <label class="check"><input type="checkbox" id="only-official"> Solo redes oficiales (AEMET y SAIH)</label>
+        <label class="check"><input type="checkbox" id="show-doubtful"> Mostrar datos de calidad dudosa</label>
+        <label class="check"><input type="checkbox" id="cluster" checked> Agrupar estaciones cercanas</label>
+      </section>
+
+      <section class="ctl">
+        <h3>Redes <button class="link-btn small" id="nets-all">todas</button></h3>
+        <div class="nets" id="nets"></div>
+      </section>
+
+      <section class="ctl">
+        <h3>Capas</h3>
+        <div class="layer-list">
+          <label class="check"><input type="checkbox" id="lyr-interp"> Interpolación (krigeado)</label>
+          <label class="check"><input type="checkbox" id="lyr-radar"> Radar de precipitación</label>
+          <label class="check"><input type="checkbox" id="lyr-sat"> Satélite (MTG)</label>
+          <label class="check"><input type="checkbox" id="lyr-li"> Rayos (MTG-LI)</label>
+          <label class="check"><input type="checkbox" id="lyr-cams"> Webcams</label>
+          <label class="check"><input type="checkbox" id="lyr-manual"> Red manual de AEMET</label>
+          <label class="check"><input type="checkbox" id="lyr-prov" checked> Límites provinciales</label>
+        </div>
+        <div class="sat-mode" id="sat-mode" hidden>
+          <div class="seg seg-sm">
+            <button data-sat="ir" class="on">Infrarrojo</button>
+            <button data-sat="vis">Visible</button>
+            <button data-sat="geo">GeoColor</button>
+          </div>
+        </div>
+        <h3 class="mt">Mapa base</h3>
+        <div class="seg seg-sm seg-wrap" id="base-seg">
+          <button data-base="auto" class="on">Auto</button>
+          <button data-base="light">Claro</button>
+          <button data-base="dark">Oscuro</button>
+          <button data-base="sat">Satélite</button>
+          <button data-base="topo">Relieve</button>
+        </div>
+        <h3 class="mt">Zona</h3>
+        <select id="zone" aria-label="Ir a una zona"></select>
+      </section>
+
+      <footer class="dock-foot" id="stats"></footer>
+    </div>
+  </aside>
+
+  <!-- ============ PANEL DE DETALLE / RANKING ============ -->
+  <aside id="side" class="dock dock-right" hidden aria-live="polite">
+    <button class="dock-close" id="side-close" aria-label="Cerrar">✕</button>
+    <div class="dock-scroll" id="side-body"></div>
+  </aside>
+
+  <!-- ============ CONTROLES SOBRE EL MAPA ============ -->
+  <div class="map-tools">
+    <button class="tool-btn" id="btn-rank" title="Clasificación de la variable"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M2 14h3V8H2zM6.5 14h3V3h-3zM11 14h3V6h-3z" fill="currentColor"/></svg> Ranking</button>
+    <button class="tool-btn" id="btn-locate" title="Mi ubicación" aria-label="Mi ubicación"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="4.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/><path d="M8 0v3M8 13v3M0 8h3M13 8h3" stroke="currentColor" stroke-width="1.6"/></svg></button>
+  </div>
+
+  <div class="legend" id="legend"></div>
+
+  <div class="timebar" id="timebar" hidden>
+    <button class="icon-btn sm" id="tb-play" aria-label="Reproducir">▶</button>
+    <input type="range" id="tb-range" min="0" max="0" value="0" aria-label="Instante">
+    <span class="tb-label" id="tb-label">--:--</span>
+    <span class="tb-what" id="tb-what"></span>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+  <div class="loading" id="loading"><div class="spinner"></div><span>Cargando estaciones…</span></div>
+</main>
+
+<script src="js/scales.js?v=1"></script>
+<script src="js/kriging.js?v=1"></script>
+<script src="js/app.js?v=1"></script>
+</body>
+</html>
