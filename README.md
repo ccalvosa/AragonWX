@@ -47,9 +47,9 @@ descarga los datos cada 10 minutos y los publica en la rama `data`.
   satélite MTG (infrarrojo, visible, GeoColor) y rayos MTG-LI de EUMETSAT, webcams
   (propias y de la DGT), red manual de AEMET y límites provinciales.
 - **Radar de Zaragoza** (AEMET, Perdiguera) desde EUMETNET OPERA (CC BY 4.0):
-  reflectividad y velocidad radial de la elevación más baja, una imagen cada 5 min
-  (alterna la exploración Doppler, 150 km a 500 m, y la de largo alcance, 250 km a
-  1 km), últimas 3 horas. `scraper/aragonwx/radar.py` y el flujo `update-radar`
+  reflectividad de alta resolución (exploración Doppler, 500 m hasta 150 km), de
+  baja resolución (largo alcance, 1 km hasta 250 km) y velocidad radial, de la
+  elevación más baja; cada producto, una imagen cada 10 min; últimas 3 horas. `scraper/aragonwx/radar.py` y el flujo `update-radar`
   (bucle de 1 min) la publican en la rama `radar`; la web pinta cada píxel con su
   celda del radar, sin estirar ni suavizar.
 - **Krigeado** a resolución de pantalla en cada zoom. En temperatura (actual, máxima

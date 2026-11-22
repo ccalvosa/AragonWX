@@ -6,9 +6,10 @@
    columna = celda), como PNG en escala de grises:
      reflectividad  dBZ = código/2 − 32      (0 = sin eco)
      velocidad      m/s = (código − 128)/3   (+ se aleja del radar; 0 = sin dato)
-   Una imagen cada 5 min, alternando la exploración Doppler (150 km, 500 m)
-   y la de largo alcance (250 km, 1 km). Al mostrar una Doppler, más allá de
-   150 km se completa con la última de largo alcance.
+   Tres productos, cada uno con su exploración (una imagen cada 10 min):
+     zh  reflectividad de alta resolución: exploración Doppler, 150 km, 500 m
+     zl  reflectividad de baja resolución: largo alcance, 250 km, 1 km
+     v   velocidad radial: exploración Doppler
 
    La capa pinta cada píxel de la pantalla con la celda del radar que le
    corresponde, sin estirar ni suavizar: se ve la resolución real a cualquier zoom.
@@ -18,10 +19,12 @@ const Radar = (() => {
   const base = () => (LOCAL ? "out/radar_pub/" : `https://raw.githubusercontent.com/${REPO}/radar/`);
   const ZMIN = 5;   // dBZ: por debajo, transparente
   const MODES = {
-    z: { label: "Reflectividad", unit: "dBZ", scale: "dbz" },
-    v: { label: "Velocidad radial", unit: "m/s", scale: "vrad" },
+    zh: { label: "Reflectividad · alta resolución", unit: "dBZ", scale: "dbz", kind: "dop", q: "z", what: "exploración Doppler: 500 m hasta 150 km" },
+    zl: { label: "Reflectividad · baja resolución", unit: "dBZ", scale: "dbz", kind: "lr", q: "z", what: "largo alcance: 1 km hasta 250 km" },
+    v:  { label: "Velocidad radial", unit: "m/s", scale: "vrad", kind: "dop", q: "v", what: "exploración Doppler: 500 m hasta 150 km" },
   };
-  let M = null, mode = "z", layer = null, cur = null, token = 0, timer = null, marks = null;
+  const Q = () => MODES[mode].q;
+  let M = null, mode = "zh", layer = null, cur = null, token = 0, timer = null, marks = null;
   const cache = new Map();   // nombre de PNG -> Promise<Uint8Array>
   const tip = document.createElement("div");
   tip.className = "arome-tip"; tip.hidden = true;
@@ -54,21 +57,16 @@ const Radar = (() => {
   /* fotogramas para la barra de tiempo (en velocidad, solo los Doppler) */
   function frames() {
     if (!M) return [];
-    return M.frames.filter(f => mode === "z" || f.v).map(f => ({ t: Date.parse(f.t), rf: f }));
+    const d = MODES[mode];
+    return M.frames.filter(f => f.kind === d.kind && (d.q === "z" || f.v)).map(f => ({ t: Date.parse(f.t), rf: f }));
   }
-  /* largo alcance anterior (≤ 15 min) para completar una Doppler más allá de 150 km */
-  function fillFor(f) {
-    if (mode !== "z" || f.kind !== "dop") return null;
-    const t = Date.parse(f.t);
-    return M.frames.filter(g => g.kind === "lr" && Date.parse(g.t) <= t && t - Date.parse(g.t) <= 15 * 60e3).pop() || null;
-  }
-
+  const fileOf = f => (Q() === "v" ? f.v : f.z);
+  function preload() { frames().forEach(({ rf }) => png(fileOf(rf)).catch(() => {})); }
   async function show(f) {
     const my = ++token;
-    const f2 = fillFor(f);
-    const [a, a2] = await Promise.all([png(mode === "z" ? f.z : f.v), f2 ? png(f2.z) : null]).catch(() => [null, null]);
+    const a = await png(fileOf(f)).catch(() => null);
     if (my !== token || !a) return;
-    cur = { f, a, f2, a2 };
+    cur = { f, a, q: Q() };
     if (!layer) layer = new PolarLayer().addTo(map); else layer._draw();
     info();
   }
@@ -114,7 +112,7 @@ const Radar = (() => {
       L.DomUtil.setPosition(cv, map.containerPointToLayerPoint([-px, -py]));
       const ctx = cv.getContext("2d"), img = ctx.createImageData(cw, ch), out = img.data;
       // solo la caja que contiene el alcance máximo
-      const { f, a, f2, a2 } = cur, rmax = Math.max(f.rstart + f.nbins * f.rscale, f2 ? f2.rstart + f2.nbins * f2.rscale : 0);
+      const { f, a } = cur, rmax = f.rstart + f.nbins * f.rscale;
       const bb = L.latLng(M.site.lat, M.site.lon).toBounds(2 * rmax * 1.02);
       const p0 = map.latLngToContainerPoint(bb.getNorthWest()), p1 = map.latLngToContainerPoint(bb.getSouthEast());
       const xa = Math.max(0, Math.floor((p0.x + px) * dpr)), xb = Math.min(cw, Math.ceil((p1.x + px) * dpr));
@@ -126,14 +124,13 @@ const Radar = (() => {
           const d = (map.containerPointToLatLng([(x + 0.5) / dpr - px, 0]).lng - M.site.lon) * rad;
           sinD[x] = Math.sin(d); cosD[x] = Math.cos(d);
         }
-        const lut = LUT[mode];
+        const lut = LUT[cur.q];
         for (let y = ya; y < yb; y++) {
           const lat = map.containerPointToLatLng([0, (y + 0.5) / dpr - py]).lat * rad, sl = Math.sin(lat), cl = Math.cos(lat);
           let o = (y * cw + xa) * 4;
           for (let x = xa; x < xb; x++, o += 4) {
             const [dist, az] = polar(sl, cl, sinD[x], cosD[x]);
-            let c = cell(f, a, dist, az);
-            if (c < 0 && f2) c = cell(f2, a2, dist, az);
+            const c = cell(f, a, dist, az);
             if (c <= 0) continue;
             const k = c * 4;
             if (!lut[k + 3]) continue;
@@ -151,17 +148,16 @@ const Radar = (() => {
     if (!cur || !M) return null;
     const d = (lon - M.site.lon) * rad, l = lat * rad;
     const [dist, az] = polar(Math.sin(l), Math.cos(l), Math.sin(d), Math.cos(d));
-    let c = cell(cur.f, cur.a, dist, az);
-    if (c < 0 && cur.f2) c = cell(cur.f2, cur.a2, dist, az);
+    const c = cell(cur.f, cur.a, dist, az);
     if (c <= 0) return null;
-    const v = decode[mode](c);
-    return mode === "z" && v < ZMIN ? null : { v, km: dist / 1000 };
+    const v = decode[cur.q](c);
+    return cur.q === "z" && v < ZMIN ? null : { v, km: dist / 1000 };
   }
   map.on("mousemove", e => {
     if (!layer || !S.layers.radar) { tip.hidden = true; return; }
     const r = valueAt(e.latlng.lat, e.latlng.lng);
     if (!r) { tip.hidden = true; return; }
-    tip.textContent = mode === "z" ? `Radar ${Math.round(r.v)} dBZ · a ${Math.round(r.km)} km`
+    tip.textContent = cur.q === "z" ? `Radar ${Math.round(r.v)} dBZ · a ${Math.round(r.km)} km`
       : `Radar ${r.v > 0 ? "+" : ""}${fmt(r.v, 1)} m/s · ${Math.abs(r.v) < 1 ? "casi nula" : r.v > 0 ? "se aleja" : "se acerca"}`;
     tip.style.left = e.containerPoint.x + 14 + "px";
     tip.style.top = e.containerPoint.y - 10 + "px";
@@ -179,8 +175,7 @@ const Radar = (() => {
     el.innerHTML = `<div class="lg-title">${d.label} <small>${d.unit}</small></div>
       <div class="lg-bar">${stops.map(([t, c]) => `<span class="lg-c" style="background:${c}" title="> ${t}"></span>`).join("")}</div>
       <div class="lg-ticks">${stops.map(([t], i) => `<span>${i % every ? "" : String(t).replace(".", ",")}</span>`).join("")}</div>
-      <p class="hint">${esc(M.site.name)} · elevación ${f ? String(f.elev).replace(".", ",") : "0,5"}° ·
-        ${f ? (f.kind === "dop" ? "exploración Doppler (150 km, 500 m)" : "largo alcance (250 km, 1 km)") : ""}
+      <p class="hint">${esc(M.site.name)} · elevación ${f ? String(f.elev).replace(".", ",") : "0,5"}° · ${d.what} · una imagen cada 10 min
         ${mode === "v" ? "<br>Verde: se acerca al radar · rojo: se aleja. Sin corregir el plegado de velocidades (±40 m/s)." : ""}</p>`;
   }
 
@@ -201,7 +196,7 @@ const Radar = (() => {
     ]);
     marks.addTo(map);
     // precarga para que la animación vaya fluida
-    M.frames.forEach(f => { png(f.z).catch(() => {}); });
+    preload();
     clearInterval(timer);
     timer = setInterval(refresh, 120e3);
   }
@@ -223,7 +218,7 @@ const Radar = (() => {
   }
   function setMode(m) {
     mode = m;
-    if (mode === "v") M?.frames.forEach(f => f.v && png(f.v).catch(() => {}));
+    if (M) preload();
   }
 
   return { start, stop, show, frames, setMode, ready: () => !!M, mode: () => mode };
