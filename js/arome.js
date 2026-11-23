@@ -142,6 +142,10 @@ const Arome = (() => {
     try { M = await getJSON(base() + "manifest.json" + bust()); }
     catch { S.layers.arome = false; $("#lyr-arome").checked = false; $("#arome-mode").hidden = true; return toast("AROME todavía no está disponible."); }
     cache.clear();
+    // variables que no trae esta pasada (p. ej. la nieve, antes de la primera pasada que la incluye): sin botón
+    const has = k => (M.hours[k] || []).length > 0;
+    $$("#model-opts button").forEach(b => { if (VARS[b.dataset.v]) b.hidden = !has(b.dataset.v); });
+    if (!has(v)) v = "pr1";
     $("#arome-mode").hidden = false;
     const run = new Date(M.run);
     $("#arome-info").textContent = `Pasada de las ${String(run.getUTCHours()).padStart(2, "0")} UTC (${run.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" })} hora peninsular) del ${run.toLocaleDateString("es-ES", { day: "numeric", month: "short", timeZone: "Europe/Madrid" })} · hasta H+${String(Math.max(...Object.values(M.hours).flat())).padStart(2, "0")} · Météo-France`;
