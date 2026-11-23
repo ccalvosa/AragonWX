@@ -16,6 +16,7 @@ const Arome = (() => {
     pr1:  { label: "Lluvia en 1 hora", unit: "mm", scale: "prec1h", dec: 1, dec0: c => (c / 25) ** 2, min: 0.1 },
     pacc: { label: "Lluvia acumulada desde el inicio", unit: "mm", scale: "prec", dec: 1, dec0: c => (c / 16) ** 2, min: 0.1 },
     gust: { label: "Racha máxima en la hora", unit: "km/h", scale: "wind", dec: 0, dec0: c => c, min: -1 },
+    snow: { label: "Nieve acumulada desde el inicio", unit: "cm", scale: "snow", dec: 1, dec0: c => (c / 25) ** 2, min: 0.2 },
     t2m:  { label: "Temperatura a 2 m", unit: "°C", scale: "temp", dec: 1, dec0: c => c / 2.5 - 40, min: -99 },
   };
   const SUB = 8;   // subdivisiones de la tabla de color por cada código (interpolación fina)

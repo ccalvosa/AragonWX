@@ -779,7 +779,7 @@ function initToolMenus() {
   syncTools();
 }
 const SATNAME = { ir: "Infrarrojo", vis: "Visible", geo: "GeoColor" };
-const MODELNAME = { pr1: "lluvia 1 h", pacc: "acumulada", gust: "racha", t2m: "temperatura" };
+const MODELNAME = { pr1: "lluvia 1 h", pacc: "acumulada", gust: "racha", t2m: "temperatura", snow: "nieve" };
 function syncTools() {
   if (!$("#btn-radar")) return;
   const rm = S.layers.radar ? Radar.mode() : "off", sm = S.layers.sat ? S.sat : "off", am = S.layers.arome ? Arome.current() : "off";

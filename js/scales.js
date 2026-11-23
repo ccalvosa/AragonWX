@@ -31,6 +31,11 @@ const SCALES = {
     [140, "#BE003D"], [130, "#AB1A85"], [120, "#9933CC"], [110, "#9966FF"], [100, "#FF78D4"], [90, "#FF5959"],
     [80, "#FF691F"], [70, "#FF8A17"], [60, "#FFC90A"], [50, "#D9F200"], [40, "#A8F500"], [30, "#4FFAB8"],
     [20, "#66F7ED"], [10, "#B0FAF7"]] },
+  // nieve acumulada (cm, 10:1)
+  snow: { below: "#9aa3ad", zero: true, stops: [
+    [100, "#3d0a5c"], [75, "#6a1b9a"], [50, "#9c3fc4"], [40, "#c86ee0"], [30, "#163c96"], [20, "#1f58b8"],
+    [15, "#2f75d0"], [10, "#4a93e0"], [5, "#6aaeea"], [2, "#8cc2f0"], [1, "#a9d3f4"], [0.5, "#c2e0f7"],
+    [0.2, "#d9ecfa"]] },
   // reflectividad del radar (dBZ); por debajo de 5, transparente
   dbz: { below: "#e9ecef", stops: [
     [70, "#ffffff"], [65, "#9854c6"], [60, "#f800fd"], [55, "#bc0000"], [50, "#d40000"], [45, "#fd0000"],

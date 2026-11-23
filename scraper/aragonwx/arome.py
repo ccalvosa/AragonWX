@@ -18,6 +18,8 @@ Campos que se publican (PNG en escala de grises, un valor codificado por píxel,
   pacc  lluvia acumulada desde H+00 (mm)   código = √p · 16
   gust  racha máxima de la hora (km/h)     código = g
   t2m   temperatura a 2 m (°C)             código = (T + 40) · 2,5
+  snow  nieve acumulada desde H+00 (cm)    código = √s · 25
+        (agua de la nieve en kg/m² con 1 mm ≈ 1 cm, relación 10:1; sin la nieve granulada)
 
 La pasada se procesa por partes en cada vuelta del bucle (límite de tiempo) en
 --stage; cuando están las 52 horas, se escribe en --publish con manifest.json y
@@ -64,6 +66,7 @@ ENC = {
     "pacc": lambda p: np.sqrt(np.clip(p, 0, None)) * 16,
     "gust": lambda g: g,
     "t2m": lambda t: (t + 40) * 2.5,
+    "snow": lambda s: np.sqrt(np.clip(s, 0, None)) * 25,
 }
 
 # identidad de lo publicado: pasada + recorte (si cambia el recorte, se rehace)
@@ -241,6 +244,8 @@ def process(stage, publish, published_run, budget):
                 to_png(sdir / f"pr1_{hour:02d}.png", np.clip(acc - base, 0, None), "pr1")
         if "ugust" in f and "vgust" in f:
             to_png(sdir / f"gust_{hour:02d}.png", np.hypot(f["ugust"], f["vgust"]) * 3.6, "gust")
+        if "snow" in f:
+            to_png(sdir / f"snow_{hour:02d}.png", f["snow"], "snow")
         if "t2m" in f:
             to_png(sdir / f"t2m_{hour:02d}.png", f["t2m"] - 273.15, "t2m")
         (sdir / f"h{hour:02d}.done").touch()
@@ -258,7 +263,7 @@ def process(stage, publish, published_run, budget):
         "bbox": [S, W, N, E], "w": w, "h": h, "hours": hours,
         # rejilla nativa: el punto (fila r, columna c) está en (N - r·step, W + c·step)
         "grid": "latlon", "step": STEP,
-        "enc": {"pr1": "sqrt25", "pacc": "sqrt16", "gust": "linear1", "t2m": "t40x2.5"},
+        "enc": {"pr1": "sqrt25", "pacc": "sqrt16", "gust": "linear1", "t2m": "t40x2.5", "snow": "sqrt25"},
     })
     log(f"  AROME: pasada {run} lista para publicar ({sum(len(v) for v in hours.values())} imágenes, "
         f"{sum(p.stat().st_size for p in publish.glob('*.png')) / 1e6:.1f} MB)")
