@@ -277,6 +277,8 @@ body.side-open .map-tools { right: 404px; }
   padding: 0.75rem 0.85rem 0.8rem; z-index: 995;
 }
 .tm-title { font-size: 0.82rem; font-weight: 700; margin-bottom: 0.5rem; }
+.tm-sub { font-size: 0.72rem; font-weight: 600; color: var(--muted); margin: 0.5rem 0 0.25rem; }
+#radar-gif { margin-top: 0.45rem; }
 .tm-title small { display: block; color: var(--muted); font-weight: 500; font-size: 0.7rem; }
 .tm-extra { margin-top: 0.6rem; }
 .tm-extra .hint { margin-top: 0.4rem; }
@@ -476,6 +478,10 @@ body.hide-stations .leaflet-marker-pane { display: none; }
 .ed-sugg .badge { display: inline-block; margin-top: 0.15rem; }
 .ed-btns { display: flex; gap: 0.3rem; flex: none; flex-wrap: wrap; }
 .eq-item { align-items: flex-start !important; }
+.er-dots { display: flex; gap: 2px; margin: 0.1rem 0; }
+.er-d { width: 9px; height: 9px; border-radius: 2px; background: var(--line, #dee2e6); }
+.er-d.ok { background: #2f9e44; } .er-d.bad { background: #e03131; }
+.eq-flag.er-ok { border-left-color: #2f9e44; } .eq-flag.er-bad { border-left-color: #e03131; } .eq-flag.er-none { border-left-color: #adb5bd; }
 .eq-flag { margin-top: 0.35rem; padding-left: 0.5rem; border-left: 2px solid #f08c00; display: flex; flex-direction: column; gap: 0.15rem; }
 .btn.sm { font-size: 0.74rem; padding: 0.22rem 0.6rem; }
 .ok-txt { color: #2b8a3e; font-weight: 600; }

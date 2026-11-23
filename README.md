@@ -59,10 +59,12 @@ descarga los datos cada 10 minutos y los publica en la rama `data`.
   elevación más baja; cada producto, una imagen cada 10 min; últimas 3 horas. `scraper/aragonwx/radar.py` y el flujo `update-radar`
   (bucle de 1 min) la publican en la rama `radar`; la web pinta cada píxel con su
   celda del radar, sin estirar ni suavizar.
-  **Lluvia estimada** de 1 h y 24 h con la exploración de largo alcance (24 h guardadas
+  **Lluvia estimada** de 1, 3, 6, 12 y 24 h con la exploración de largo alcance (24 h guardadas
   en `arch/`): Marshall-Palmer (Z = 200·R^1,6, de 7 a 55 dBZ), sin las celdas de ecos
   fijos (mapa de frecuencia de eco con memoria de ~2 días, `clutter.png`) y corregida
   con un único factor frente a los pluviómetros de AEMET (lluvia de 24 h de `now.json`).
+  **Descargar GIF** graba en el navegador la animación de la vista actual (mapa base,
+  límites, radar, hora y leyenda) con [gifenc](https://github.com/mattdesl/gifenc).
 - **Krigeado** a resolución de pantalla en cada zoom. En temperatura (actual, máxima
   y mínima) tiene en cuenta la altitud: se ajusta a las estaciones una recta con la
   altitud, o dos tramos si hay inversión (la leyenda muestra el gradiente), se krigean
@@ -253,6 +255,19 @@ Un aviso solo se sugiere si se repite al menos 6 pasadas hoy (≈ 1 h) o en 2 d�
 - **Marcar deficiente** pone la calidad de esa variable a *Deficiente*.
 - **Descartar** añade `qc-ignore=<variable>` a las notas de la estación, para no volver a
   avisar de esa variable.
+
+**Revisión de las deficientes** (`scraper/aragonwx/rehab.py`, `rehab.json`, una vez al día;
+pestaña **Deficientes** del editor). Cada variable marcada *Deficiente* se compara día a día,
+en los últimos 14 días cerrados de `history/`, con la mediana de sus vecinas fiables:
+- máxima y mínima: ≤ 20 km y |Δz| < 300 m; día bueno si |diferencia| ≤ max(2 °C, 2·σ);
+  «parece recuperada» con ≥ 8 días, ≥ 90 % buenos, |sesgo| ≤ 0,7 °C y ningún día a más de
+  2,5 °C hacia el lado del fallo (por encima en la máxima, por debajo en la mínima);
+- lluvia: solo los días con lluvia en las vecinas (≥ 3 y ninguno malo) o en los que marca
+  ≥ 3 mm con las vecinas secas;
+- racha: días con mediana ≥ 20 km/h, razón con la mediana entre 0,65 y 1,5;
+- una serie congelada nunca se da por buena.
+El botón **Quitar «Deficiente»** deja la variable sin valorar. En invierno, cuidado con la
+máxima: un sensor al sol apenas se pasa con el sol bajo.
 
 ## Estado y avisos
 

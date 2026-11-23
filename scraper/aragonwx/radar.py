@@ -13,8 +13,8 @@ La web pinta cada píxel de la pantalla con la celda del radar que le correspond
 Se conservan las últimas KEEP_H horas y manifest.json las describe.
 
 Además, con la exploración de largo alcance de las últimas 24 h (carpeta arch/),
-se publica la lluvia estimada de 1 h y de 24 h, corregida con los pluviómetros:
-  a1h_AAAAMMDDTHHMM.png, a24h_….png   código = √mm · 16 (0 = menos de 0,1 mm)
+se publica la lluvia estimada de 1, 3, 6, 12 y 24 h, corregida con los pluviómetros:
+  a{1,3,6,12,24}h_AAAAMMDDTHHMM.png    código = √mm · 16 (0 = menos de 0,1 mm)
 
     python -m aragonwx.radar --pub ../out/radar_pub
 """
@@ -135,6 +135,7 @@ BIAS_MIN_PAIRS, BIAS_RANGE = 5, (0.25, 4.0)
 # Ecos fijos (montañas, edificios): frecuencia de eco de cada celda con una media
 # exponencial de ~2 días; las celdas con eco más de la mitad del tiempo no suman lluvia.
 CLUTTER_TAU, CLUTTER_ON, CLUTTER_SEED = 288, 0.5, 0.9
+PERIODS = (1, 3, 6, 12, 24)   # horas de los acumulados
 
 
 def rain_rate(code):
@@ -198,33 +199,35 @@ def accumulate(ses, pub, man):
     sig = f"{files[-1].stem}:{len(files)}"
     if man.get("acc", {}).get("sig") == sig:
         return False
-    acc1 = np.zeros((geo["nrays"], geo["nbins"]))
-    acc24 = np.zeros_like(acc1)
-    echo = np.zeros_like(acc1)
-    n1 = n24 = 0
+    shape = (geo["nrays"], geo["nbins"])
+    acc = {h: np.zeros(shape) for h in PERIODS}
+    nf = {h: 0 for h in PERIODS}
+    echo = np.zeros(shape)
     last_echo = None
     for p in files:
         age = (t_last - utc(p.stem[2:])).total_seconds() / 60
         if age >= 24 * 60:
             continue
         a = np.asarray(Image.open(p))
-        if a.shape != acc1.shape:
+        if a.shape != shape:
             continue
         rr = rain_rate(a)
         r = rr * STEP_MIN / 60
-        acc24 += r; n24 += 1
         echo += rr > 0
-        if age < 60:
-            acc1 += r; n1 += 1
+        for h in PERIODS:
+            if age < h * 60:
+                acc[h] += r; nf[h] += 1
         if age == 0:
             last_echo = rr > 0
-    e1, e24 = 60 // STEP_MIN, 24 * 60 // STEP_MIN
+    n24 = nf[24]
+    exp = {h: h * 60 // STEP_MIN for h in PERIODS}
+    e24 = exp[24]
     # mapa de ecos fijos
     cpath = pub / "clutter.png"
     freq24 = echo / max(n24, 1)
     if cpath.exists():
         cl = np.asarray(Image.open(cpath)).astype(np.float64) / 250
-        if cl.shape != acc1.shape:
+        if cl.shape != shape:
             cl = None
     else:
         cl = None
@@ -237,29 +240,33 @@ def accumulate(ses, pub, man):
         Image.fromarray(np.round(cl * 250).astype(np.uint8), "L").save(cpath, optimize=True)
         fixed = cl >= CLUTTER_ON
     else:
-        fixed = (freq24 >= CLUTTER_SEED) if n24 >= 18 else np.zeros_like(acc1, bool)   # ≥ 3 h de imágenes
-    acc1[fixed] = 0
-    acc24[fixed] = 0
+        fixed = (freq24 >= CLUTTER_SEED) if n24 >= 18 else np.zeros(shape, bool)   # ≥ 3 h de imágenes
     # imágenes que faltan: se reparten solo si faltan pocas (si no, se publica lo que hay)
-    if e1 > n1 >= 4:
-        acc1 *= e1 / n1
-    if e24 > n24 >= 0.8 * e24:
-        acc24 *= e24 / n24
-    bias, npairs = gauge_bias(ses, acc24, geo, man["site"], t_last) if n24 >= 0.8 * e24 else (None, 0)
-    f = bias or 1.0
+    complete = lambda h: nf[h] >= (4 if h == 1 else 0.8 * exp[h])
+    for h in PERIODS:
+        acc[h][fixed] = 0
+        if exp[h] > nf[h] and complete(h):
+            acc[h] *= exp[h] / nf[h]
+    bias, npairs = gauge_bias(ses, acc[24], geo, man["site"], t_last) if complete(24) else (None, 0)
+    f = bias or 1.0   # un único factor (sesgo medio del campo de 24 h) para todos los periodos
     stamp = t_last.strftime("%Y%m%dT%H%M")
-    code = lambda acc: np.where(acc * f >= 0.1, np.clip(np.round(np.sqrt(acc * f) * 16), 1, 254), 0).astype(np.uint8)
-    for old in list(pub.glob("a1h_*.png")) + list(pub.glob("a24h_*.png")):
+    code = lambda a: np.where(a * f >= 0.1, np.clip(np.round(np.sqrt(a * f) * 16), 1, 254), 0).astype(np.uint8)
+    for old in pub.glob("a*h_*.png"):
         old.unlink()
-    save_png(code(acc1), pub / f"a1h_{stamp}.png")
-    save_png(code(acc24), pub / f"a24h_{stamp}.png")
-    man["acc"] = {"t": t_last.strftime("%Y-%m-%dT%H:%MZ"), "h1": f"a1h_{stamp}.png", "h24": f"a24h_{stamp}.png",
-                  "n1": n1, "n24": n24, "e1": e1, "e24": e24, "bias": bias, "pairs": npairs, "sig": sig,
+    per = {}
+    for h in PERIODS:
+        name = f"a{h}h_{stamp}.png"
+        save_png(code(acc[h]), pub / name)
+        per[str(h)] = {"f": name, "n": nf[h], "e": exp[h], "max": round(float(acc[h].max() * f), 1)}
+    man["acc"] = {"t": t_last.strftime("%Y-%m-%dT%H:%MZ"), "per": per,
+                  # claves antiguas (1 h y 24 h) para las páginas que aún no lean «per»
+                  "h1": per["1"]["f"], "h24": per["24"]["f"], "n1": nf[1], "n24": n24, "e1": exp[1], "e24": e24,
+                  "bias": bias, "pairs": npairs, "sig": sig,
                   "clutter": int(fixed.sum()), "clutter_map": cl is not None,
                   "acode": "mm = (c/16)^2", "zr": "Marshall-Palmer Z = 200·R^1,6", **geo}
-    print(f"radar: lluvia 1 h ({n1}/{e1}) y 24 h ({n24}/{e24}) a las {man['acc']['t']}, "
+    print(f"radar: lluvia {', '.join(f'{h} h ({nf[h]}/{exp[h]})' for h in PERIODS)} a las {man['acc']['t']}, "
           f"corrección {bias if bias else 'ninguna'} con {npairs} pluviómetros; {int(fixed.sum())} celdas de ecos fijos; "
-          f"máx. 24 h {acc24.max() * f:.1f} mm")
+          f"máx. 24 h {per['24']['max']:.1f} mm")
     return True
 
 

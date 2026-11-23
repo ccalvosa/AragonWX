@@ -21,7 +21,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
-<link rel="stylesheet" href="css/style.css?v=19">
+<link rel="stylesheet" href="css/style.css?v=20">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 </head>
@@ -169,12 +169,15 @@
         <button data-v="zh" title="Exploración Doppler: celdas de 500 m hasta 150 km">Reflectividad alta resolución</button>
         <button data-v="zl" title="Largo alcance: celdas de 1 km hasta 250 km">Reflectividad baja resolución</button>
         <button data-v="v">Velocidad radial</button>
-        <button data-v="a1" title="Estimada con la reflectividad y corregida con los pluviómetros de AEMET">Lluvia 1 h</button>
-        <button data-v="a24" title="Estimada con la reflectividad y corregida con los pluviómetros de AEMET">Lluvia 24 h</button>
+      </div>
+      <div class="tm-sub" title="Estimada con la reflectividad y corregida con los pluviómetros de AEMET">Lluvia estimada</div>
+      <div class="seg seg-sm seg-wrap tm-opts" id="radar-acc">
+        <button data-v="a1">1 h</button><button data-v="a3">3 h</button><button data-v="a6">6 h</button><button data-v="a12">12 h</button><button data-v="a24">24 h</button>
       </div>
       <div id="radar-mode" class="tm-extra" hidden>
         <div class="radar-info" id="radar-info"></div>
         <label class="check"><input type="checkbox" id="radar-hide"> Ocultar las estaciones</label>
+        <button class="btn ghost sm" id="radar-gif" title="Graba la animación de la vista actual">Descargar GIF</button>
       </div>
     </div>
     <div class="tool-menu" id="menu-sat" hidden>
@@ -223,12 +226,12 @@
 <script src="js/scales.js?v=5"></script>
 <script src="js/kriging.js?v=4"></script>
 <script src="js/forecast.js?v=3"></script>
-<script src="js/app.js?v=25"></script>
+<script src="js/app.js?v=26"></script>
 <script src="js/arome.js?v=6"></script>
-<script src="js/radar.js?v=4"></script>
+<script src="js/radar.js?v=5"></script>
 <script src="js/aemethist.js?v=3"></script>
 <script src="js/avisos.js?v=2"></script>
 <script src="js/summary.js?v=4"></script>
-<script src="js/editor.js?v=3"></script>
+<script src="js/editor.js?v=4"></script>
 </body>
 </html>

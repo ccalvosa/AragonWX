@@ -10,7 +10,10 @@
      zh  reflectividad de alta resolución: exploración Doppler, 150 km, 500 m
      zl  reflectividad de baja resolución: largo alcance, 250 km, 1 km
      v   velocidad radial: exploración Doppler
-     a1, a24  lluvia estimada en 1 y 24 h (largo alcance, corregida con pluviómetros)
+     a1 … a24  lluvia estimada en 1, 3, 6, 12 y 24 h (largo alcance, corregida con pluviómetros)
+
+   «Descargar GIF» graba la animación de la vista actual (mapa base, límites de
+   provincia, radar, hora y leyenda) con gifenc, que se carga solo al pulsarlo.
 
    La capa pinta cada píxel de la pantalla con la celda del radar que le
    corresponde, sin estirar ni suavizar: se ve la resolución real a cualquier zoom.
@@ -23,9 +26,10 @@ const Radar = (() => {
     zh: { label: "Reflectividad · alta resolución", unit: "dBZ", scale: "dbz", kind: "dop", q: "z", what: "exploración Doppler: 500 m hasta 150 km" },
     zl: { label: "Reflectividad · baja resolución", unit: "dBZ", scale: "dbz", kind: "lr", q: "z", what: "largo alcance: 1 km hasta 250 km" },
     v:  { label: "Velocidad radial", unit: "m/s", scale: "vrad", kind: "dop", q: "v", what: "exploración Doppler: 500 m hasta 150 km" },
-    a1:  { label: "Lluvia estimada en 1 hora", unit: "mm", scale: "prec1h", q: "a1", acc: "h1" },
-    a24: { label: "Lluvia estimada en 24 horas", unit: "mm", scale: "prec", q: "a24", acc: "h24" },
   };
+  const PERIODS = [1, 3, 6, 12, 24];
+  for (const h of PERIODS)   // lluvia: hasta 3 h con la escala horaria, más con la diaria
+    MODES["a" + h] = { label: `Lluvia estimada en ${h} ${h === 1 ? "hora" : "horas"}`, unit: "mm", scale: h <= 3 ? "prec1h" : "prec", q: h <= 3 ? "a1" : "a24", acc: h };
   const Q = () => MODES[mode].q;
   let M = null, mode = "zh", layer = null, cur = null, token = 0, timer = null, marks = null;
   const cache = new Map();   // nombre de PNG -> Promise<Uint8Array>
@@ -66,8 +70,15 @@ const Radar = (() => {
   function frames() {
     if (!M) return [];
     const d = MODES[mode];
-    if (d.acc) return M.acc ? [{ t: Date.parse(M.acc.t), rf: { ...M.acc, z: M.acc[d.acc], elev: 0.5 } }] : [];
+    if (d.acc) { const file = accOf(d.acc)?.f; return file ? [{ t: Date.parse(M.acc.t), rf: { ...M.acc, z: file, elev: 0.5 } }] : []; }
     return M.frames.filter(f => f.kind === d.kind && (d.q === "z" || f.v)).map(f => ({ t: Date.parse(f.t), rf: f }));
+  }
+  /* acumulado de h horas: {f, n, e} (los manifiestos antiguos solo traen 1 y 24 h) */
+  function accOf(h) {
+    const a = M?.acc;
+    if (!a) return null;
+    if (a.per) return a.per[h] || null;
+    return h === 1 ? { f: a.h1, n: a.n1, e: a.e1 } : h === 24 ? { f: a.h24, n: a.n24, e: a.e24 } : null;
   }
   const fileOf = f => (Q() === "v" ? f.v : f.z);
   function preload() { frames().forEach(({ rf }) => png(fileOf(rf)).catch(() => {})); }
@@ -75,7 +86,7 @@ const Radar = (() => {
     const my = ++token;
     const a = await png(fileOf(f)).catch(() => null);
     if (my !== token || !a) return;
-    cur = { f, a, q: Q() };
+    cur = { f, a, q: Q(), h: MODES[mode].acc };
     if (!layer) layer = new PolarLayer().addTo(map); else layer._draw();
     info();
   }
@@ -92,6 +103,36 @@ const Radar = (() => {
     if (bin < 0 || bin >= fr.nbins) return -1;
     const ray = Math.floor(((az - fr.az0 + 720) % 360) * fr.nrays / 360) % fr.nrays;
     return arr[ray * fr.nbins + bin];
+  }
+
+  /* pinta la exploración en out (RGBA, cw×ch). lngOf(x) y latOf(y) dan la longitud de cada columna y la
+     latitud de cada fila (Mercator es separable); [xa, xb) × [ya, yb) es la caja que hay que recorrer. */
+  function paintPolar(out, cw, f, a, lut, lngOf, latOf, xa, xb, ya, yb) {
+    const sinD = new Float64Array(xb), cosD = new Float64Array(xb);
+    for (let x = xa; x < xb; x++) {
+      const d = (lngOf(x) - M.site.lon) * rad;
+      sinD[x] = Math.sin(d); cosD[x] = Math.cos(d);
+    }
+    for (let y = ya; y < yb; y++) {
+      const lat = latOf(y) * rad, sl = Math.sin(lat), cl = Math.cos(lat);
+      let o = (y * cw + xa) * 4;
+      for (let x = xa; x < xb; x++, o += 4) {
+        const [dist, az] = polar(sl, cl, sinD[x], cosD[x]);
+        const c = cell(f, a, dist, az);
+        if (c <= 0) continue;
+        const k = c * 4;
+        if (!lut[k + 3]) continue;
+        out[o] = lut[k]; out[o + 1] = lut[k + 1]; out[o + 2] = lut[k + 2]; out[o + 3] = 255;
+      }
+    }
+  }
+  /* caja de píxeles (escala k sobre los puntos del contenedor, desplazados ox, oy) que contiene el alcance */
+  function rangeBox(f, k, ox, oy, cw, ch) {
+    const rmax = f.rstart + f.nbins * f.rscale;
+    const bb = L.latLng(M.site.lat, M.site.lon).toBounds(2 * rmax * 1.02);
+    const p0 = map.latLngToContainerPoint(bb.getNorthWest()), p1 = map.latLngToContainerPoint(bb.getSouthEast());
+    return [Math.max(0, Math.floor((p0.x + ox) * k)), Math.min(cw, Math.ceil((p1.x + ox) * k)),
+            Math.max(0, Math.floor((p0.y + oy) * k)), Math.min(ch, Math.ceil((p1.y + oy) * k))];
   }
 
   const PolarLayer = L.Layer.extend({
@@ -121,32 +162,11 @@ const Radar = (() => {
       L.DomUtil.setPosition(cv, map.containerPointToLayerPoint([-px, -py]));
       const ctx = cv.getContext("2d"), img = ctx.createImageData(cw, ch), out = img.data;
       // solo la caja que contiene el alcance máximo
-      const { f, a } = cur, rmax = f.rstart + f.nbins * f.rscale;
-      const bb = L.latLng(M.site.lat, M.site.lon).toBounds(2 * rmax * 1.02);
-      const p0 = map.latLngToContainerPoint(bb.getNorthWest()), p1 = map.latLngToContainerPoint(bb.getSouthEast());
-      const xa = Math.max(0, Math.floor((p0.x + px) * dpr)), xb = Math.min(cw, Math.ceil((p1.x + px) * dpr));
-      const ya = Math.max(0, Math.floor((p0.y + py) * dpr)), yb = Math.min(ch, Math.ceil((p1.y + py) * dpr));
-      if (xb > xa && yb > ya) {
-        // la proyección es separable: latitud por fila y longitud por columna
-        const sinD = new Float64Array(cw), cosD = new Float64Array(cw);
-        for (let x = xa; x < xb; x++) {
-          const d = (map.containerPointToLatLng([(x + 0.5) / dpr - px, 0]).lng - M.site.lon) * rad;
-          sinD[x] = Math.sin(d); cosD[x] = Math.cos(d);
-        }
-        const lut = LUT[cur.q];
-        for (let y = ya; y < yb; y++) {
-          const lat = map.containerPointToLatLng([0, (y + 0.5) / dpr - py]).lat * rad, sl = Math.sin(lat), cl = Math.cos(lat);
-          let o = (y * cw + xa) * 4;
-          for (let x = xa; x < xb; x++, o += 4) {
-            const [dist, az] = polar(sl, cl, sinD[x], cosD[x]);
-            const c = cell(f, a, dist, az);
-            if (c <= 0) continue;
-            const k = c * 4;
-            if (!lut[k + 3]) continue;
-            out[o] = lut[k]; out[o + 1] = lut[k + 1]; out[o + 2] = lut[k + 2]; out[o + 3] = 255;
-          }
-        }
-      }
+      const { f, a } = cur;
+      const [xa, xb, ya, yb] = rangeBox(f, dpr, px, py, cw, ch);
+      if (xb > xa && yb > ya)
+        paintPolar(out, cw, f, a, LUT[cur.q], x => map.containerPointToLatLng([(x + 0.5) / dpr - px, 0]).lng,
+          y => map.containerPointToLatLng([0, (y + 0.5) / dpr - py]).lat, xa, xb, ya, yb);
       ctx.putImageData(img, 0, 0);
       cv.style.visibility = "visible";
     },
@@ -166,7 +186,7 @@ const Radar = (() => {
     if (!layer || !S.layers.radar) { tip.hidden = true; return; }
     const r = valueAt(e.latlng.lat, e.latlng.lng);
     if (!r) { tip.hidden = true; return; }
-    tip.textContent = cur.q.startsWith("a") ? `Radar ${fmt(r.v, r.v < 10 ? 1 : 0)} mm en ${cur.q === "a1" ? "1 h" : "24 h"} (estimado)`
+    tip.textContent = cur.h ? `Radar ${fmt(r.v, r.v < 10 ? 1 : 0)} mm en ${cur.h} h (estimado)`
       : cur.q === "z" ? `Radar ${Math.round(r.v)} dBZ · a ${Math.round(r.km)} km`
       : `Radar ${r.v > 0 ? "+" : ""}${fmt(r.v, 1)} m/s · ${Math.abs(r.v) < 1 ? "casi nula" : r.v > 0 ? "se aleja" : "se acerca"}`;
     tip.style.left = e.containerPoint.x + 14 + "px";
@@ -192,7 +212,9 @@ const Radar = (() => {
   function accNote(d) {
     const a = M.acc;
     if (!a) return "Todavía no hay acumulados.";
-    const h1 = d.acc === "h1", n = h1 ? a.n1 : a.n24, e = h1 ? a.e1 : a.e24;
+    const p = accOf(d.acc);
+    if (!p) return "Este acumulado todavía no está disponible.";
+    const h1 = d.acc === 1, n = p.n, e = p.e;
     const t = new Date(a.t).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
     const cov = n >= e ? "" : n >= (h1 ? 4 : 0.8 * e) ? ` (faltan ${e - n} imágenes; se ha completado el hueco)`
       : ` · <b>incompleto: solo ${Math.round(n * 10 / 60 * 10) / 10} h de datos</b>`;
@@ -200,6 +222,114 @@ const Radar = (() => {
       : "sin corregir con pluviómetros (pocos con lluvia o faltan datos)";
     return `Hasta las ${t}${cov} · largo alcance (1 km, 250 km) · intensidad con Marshall-Palmer, ${bias}. `
       + `No cuenta ${a.clutter} celdas con ecos fijos del terreno. Es una estimación: el radar ve la lluvia en altura y lejos del radar se queda corto.`;
+  }
+
+  /* ---------- GIF de la animación en la vista actual ---------- */
+  const GIFENC = "https://cdn.jsdelivr.net/npm/gifenc@1.0.3/dist/gifenc.esm.js";
+  function img(url) {
+    return new Promise(res => { const im = new Image(); im.crossOrigin = "anonymous"; im.onload = () => res(im); im.onerror = () => res(null); im.src = url; });
+  }
+  /* teselas de una capa de Leaflet dibujadas en ctx a la escala k (mismo encuadre que el mapa) */
+  async function drawTiles(ctx, lyr, k) {
+    const o = lyr.options, zoom = map.getZoom();
+    const z = Math.max(o.minZoom || 0, Math.min(Math.round(zoom), o.maxNativeZoom ?? o.maxZoom ?? 18));
+    const sc = map.getZoomScale(zoom, z), size = map.getSize();
+    const tl = map.project(map.containerPointToLatLng([0, 0]), z), br = map.project(map.containerPointToLatLng([size.x, size.y]), z);
+    const T = 256, n = 2 ** z, jobs = [];
+    for (let ty = Math.floor(tl.y / T); ty <= Math.floor(br.y / T); ty++) {
+      if (ty < 0 || ty >= n) continue;
+      for (let tx = Math.floor(tl.x / T); tx <= Math.floor(br.x / T); tx++) {
+        const url = L.Util.template(lyr._url, { ...o, x: ((tx % n) + n) % n, y: ty, z, s: "a", r: "" });
+        jobs.push(img(url).then(im => im && [im, (tx * T - tl.x) * sc * k, (ty * T - tl.y) * sc * k]));
+      }
+    }
+    ctx.globalAlpha = o.opacity ?? 1;
+    for (const t of await Promise.all(jobs)) if (t) ctx.drawImage(t[0], t[1], t[2], T * sc * k + 0.5, T * sc * k + 0.5);
+    ctx.globalAlpha = 1;
+  }
+  async function exportGif(btn) {
+    const fr = frames();
+    if (!fr.length) return toast("No hay imágenes del radar para grabar.");
+    const old = btn.textContent;
+    btn.disabled = true; btn.textContent = "Preparando el GIF…";
+    try {
+      const { GIFEncoder, quantize, applyPalette } = await import(GIFENC);
+      const size = map.getSize(), k = Math.min(1, 900 / size.x, 700 / size.y);
+      const W = Math.round(size.x * k), H = Math.round(size.y * k), LEG = 34;
+      // fondo fijo: mapa base, sombreado y límites de provincia
+      const under = document.createElement("canvas"); under.width = W; under.height = H;
+      const uc = under.getContext("2d");
+      uc.fillStyle = isDark() ? "#1e2124" : "#e9ecef"; uc.fillRect(0, 0, W, H);
+      const labels = baseLayers.filter(l => l.options.pane === "labels");
+      for (const l of baseLayers) if (!labels.includes(l) && l._url) await drawTiles(uc, l, k);
+      const over = document.createElement("canvas"); over.width = W; over.height = H;
+      const oc = over.getContext("2d");
+      for (const l of labels) if (l._url) await drawTiles(oc, l, k);
+      oc.strokeStyle = isDark() ? "rgba(255,255,255,.55)" : "rgba(40,40,40,.65)"; oc.lineWidth = 1.2;
+      for (const ring of RINGS || []) {
+        oc.beginPath();
+        ring.forEach(([lon, lat], i) => { const p = map.latLngToContainerPoint([lat, lon]); oc[i ? "lineTo" : "moveTo"](p.x * k, p.y * k); });
+        oc.stroke();
+      }
+      const site = map.latLngToContainerPoint([M.site.lat, M.site.lon]);
+      oc.fillStyle = "#212529"; oc.strokeStyle = "#fff"; oc.lineWidth = 2;
+      oc.beginPath(); oc.arc(site.x * k, site.y * k, 4, 0, 7); oc.fill(); oc.stroke();
+      // fotograma: fondo + radar + encima + rótulos
+      const d = MODES[mode], lut = LUT[d.q], cv = document.createElement("canvas");
+      cv.width = W; cv.height = H + LEG;
+      const ctx = cv.getContext("2d", { willReadFrequently: true });
+      const rcv = document.createElement("canvas"); rcv.width = W; rcv.height = H;
+      const rctx = rcv.getContext("2d");
+      const lngOf = x => map.containerPointToLatLng([(x + 0.5) / k, 0]).lng, latOf = y => map.containerPointToLatLng([0, (y + 0.5) / k]).lat;
+      const stops = SCALES[d.scale].stops.slice().reverse();
+      const gif = GIFEncoder();
+      for (let i = 0; i < fr.length; i++) {
+        btn.textContent = `Grabando ${i + 1}/${fr.length}…`;
+        const f = fr[i].rf, a = await png(d.acc ? f.z : (d.q === "v" ? f.v : f.z)).catch(() => null);
+        if (!a) continue;
+        ctx.drawImage(under, 0, 0);
+        const im = rctx.createImageData(W, H);
+        const [xa, xb, ya, yb] = rangeBox(f, k, 0, 0, W, H);
+        if (xb > xa && yb > ya) paintPolar(im.data, W, f, a, lut, lngOf, latOf, xa, xb, ya, yb);
+        rctx.putImageData(im, 0, 0);
+        ctx.globalAlpha = 0.85; ctx.drawImage(rcv, 0, 0); ctx.globalAlpha = 1;
+        ctx.drawImage(over, 0, 0);
+        // hora y título
+        const t = new Date(fr[i].t).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+        ctx.font = "600 15px system-ui, sans-serif";
+        const title = `${d.acc ? "Hasta el " : ""}${t} · ${d.label}`;
+        ctx.fillStyle = "rgba(255,255,255,.88)"; ctx.fillRect(8, 8, ctx.measureText(title).width + 16, 26);
+        ctx.fillStyle = "#212529"; ctx.fillText(title, 16, 26);
+        // leyenda y créditos
+        ctx.fillStyle = "#fff"; ctx.fillRect(0, H, W, LEG);
+        const bw = Math.min(16, (W * 0.6) / stops.length);
+        stops.forEach(([v, c], j) => { ctx.fillStyle = c; ctx.fillRect(8 + j * bw, H + 5, bw, 10); });
+        ctx.fillStyle = "#495057"; ctx.font = "10px system-ui, sans-serif";
+        const ev = Math.ceil(stops.length / 8);
+        stops.forEach(([v], j) => { if (j % ev === 0) ctx.fillText(String(v).replace(".", ","), 8 + j * bw, H + 27); });
+        ctx.fillText(d.unit, 12 + stops.length * bw, H + 14);
+        ctx.textAlign = "right";
+        ctx.fillText(`Radar de ${M.site.name} · AEMET · EUMETNET OPERA · mapa Esri · AragonWX`, W - 8, H + 27);
+        ctx.textAlign = "left";
+        const px = ctx.getImageData(0, 0, W, H + LEG).data;
+        const pal = quantize(px, 256);
+        gif.writeFrame(applyPalette(px, pal), W, H + LEG, { palette: pal, delay: i === fr.length - 1 ? 1500 : 450 });
+        await new Promise(r => setTimeout(r));   // deja respirar a la página
+      }
+      gif.finish();
+      const blob = new Blob([gif.bytes()], { type: "image/gif" });
+      const last = new Date(fr.at(-1).t), pad = n => String(n).padStart(2, "0");
+      const name = `radar-${mode}-${last.getFullYear()}${pad(last.getMonth() + 1)}${pad(last.getDate())}-${pad(last.getHours())}${pad(last.getMinutes())}.gif`;
+      const aEl = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: name });
+      document.body.appendChild(aEl); aEl.click(); aEl.remove();
+      setTimeout(() => URL.revokeObjectURL(aEl.href), 10e3);
+      toast(`GIF listo: ${fr.length} ${fr.length === 1 ? "imagen" : "imágenes"}, ${Math.round(blob.size / 1024)} KB`);
+    } catch (e) {
+      console.error(e);
+      toast("No se ha podido generar el GIF.");
+    } finally {
+      btn.disabled = false; btn.textContent = old;
+    }
   }
 
   async function load() {
@@ -244,5 +374,5 @@ const Radar = (() => {
     if (M) preload();
   }
 
-  return { start, stop, show, frames, setMode, ready: () => !!M, mode: () => mode };
+  return { start, stop, show, frames, setMode, exportGif, ready: () => !!M, mode: () => mode, MODES };
 })();

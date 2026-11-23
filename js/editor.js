@@ -133,14 +133,14 @@ const Editor = (() => {
     document.body.classList.add("editing");
     openSide("editor", `<div class="eyebrow">Editor de la red <button class="link-btn small" id="ed-out">salir</button></div>
       <h2 class="st-name">Estaciones</h2>
-      <div class="seg seg-sm ed-tabs" id="ed-tabs">
+      <div class="seg seg-sm seg-wrap ed-tabs" id="ed-tabs">
         <button data-t="changes">Cambios${pending.length ? ` (${pending.length})` : ""}</button>
-        <button data-t="qc">Sospechosas</button><button data-t="add">Alta</button><button data-t="sugg">Sugerencias</button></div>
+        <button data-t="qc">Sospechosas</button><button data-t="rehab">Deficientes</button><button data-t="add">Alta</button><button data-t="sugg">Sugerencias</button></div>
       <div id="ed-body"></div>`);
     $("#ed-out").addEventListener("click", logout);
     $$("#ed-tabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === tab); b.addEventListener("click", () => { tab = b.dataset.t; render(); }); });
     if (tab !== "sugg") clearSugg();
-    ({ changes: renderChanges, qc: renderQC, add: () => renderAdd(), sugg: renderSugg })[tab]();
+    ({ changes: renderChanges, qc: renderQC, rehab: renderRehab, add: () => renderAdd(), sugg: renderSugg })[tab]();
   }
 
   function renderChanges() {
@@ -291,6 +291,71 @@ const Editor = (() => {
         addChange({ type: "update", id, label: `${e.name}: descartar aviso de ${VNAME[f.var]}`, fields: { notes: withIgnore(notesOf(id), f.var) } });
         renderQC();
       }));
+    });
+  }
+
+  /* ---------- deficientes: ¿vuelven a dar datos buenos? (rehab.json, una vez al día) ---------- */
+  const RVAR = { x: ["máxima", "°C"], n: ["mínima", "°C"], p: ["lluvia", "mm"], w: ["racha", "km/h"] };
+  const RVERD = {
+    ok: ["Parece recuperada", "ok"], mixed: ["Dudosa: unos días bien y otros no", "warn"], bad: ["Sigue mal", "bad"],
+    few: ["Pocos días para comparar", ""], nonb: ["Sin vecinas fiables cerca", ""], nodata: ["Sin datos estos días", ""],
+  };
+  const REST = ["few", "nonb", "nodata"];
+  let rehabFilter = "ok";
+  async function renderRehab() {
+    $("#ed-body").innerHTML = `<p class="hint">Variables marcadas como <b>Deficiente</b>, comparadas día a día con la mediana
+      de sus vecinas fiables en los últimos 14 días cerrados. Si una estación se ha arreglado, aquí se ve y puedes quitarle la marca.
+      Ojo en invierno con la máxima: un sensor al sol apenas se pasa con el sol bajo.</p>
+      <div class="seg seg-sm seg-wrap" id="er-f"><button data-f="ok">Recuperadas</button><button data-f="mixed">Dudosas</button>
+        <button data-f="bad">Siguen mal</button><button data-f="rest">Sin comparar</button><button data-f="all">Todas</button></div>
+      <p class="st-status" id="er-info">Cargando…</p><ul class="ed-sugg" id="er-list"></ul>`;
+    let q;
+    try { q = await getJSON(DATA_URL + "rehab.json" + bust()); }
+    catch { $("#er-info").textContent = "Todavía no hay revisión de las deficientes (la hace el bucle una vez al día)."; return; }
+    const done = new Set(pending.filter(p => p.type === "update").flatMap(p => Object.keys(p.fields).map(k => p.id + ":" + k)));
+    const all = Object.entries(q.stations).flatMap(([id, st]) => st.vars.map(e => ({ id, st, e })))
+      .filter(({ id, e }) => !done.has(id + ":" + e.qcol));
+    const inF = (f, v) => f === "all" || (f === "rest" ? REST.includes(v) : v === f);
+    $$("#er-f button").forEach(b => {
+      b.textContent += ` (${all.filter(({ e }) => inF(b.dataset.f, e.verdict)).length})`;
+      b.classList.toggle("on", b.dataset.f === rehabFilter);
+      b.addEventListener("click", () => { rehabFilter = b.dataset.f; renderRehab(); });
+    });
+    const order = { ok: 0, mixed: 1, bad: 2, few: 3, nonb: 4, nodata: 5 };
+    const share = e => e.good / (e.n || 1);
+    const items = all.filter(({ e }) => inF(rehabFilter, e.verdict))
+      .sort((a, b) => order[a.e.verdict] - order[b.e.verdict] || share(b.e) - share(a.e) || a.st.name.localeCompare(b.st.name));
+    const d = s => new Date(s + "T12:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+    $("#er-info").textContent = `${items.length} variables · del ${d(q.days[0])} al ${d(q.days[1])}`;
+    const num = (v, dd = 1) => (v == null ? "–" : fmt(v, dd));
+    const stats = e => {
+      const u = RVAR[e.var][1];
+      const b = e.var === "w" ? `racha ×${num(e.bias, 2)} la de sus vecinas`
+        : `sesgo ${signed(e.bias)} ${u}${e.mad != null ? ` · error medio ${num(e.mad)} ${u}` : ""}${e.peak != null ? ` · peor día ${signed(e.peak)} ${u}` : ""}`;
+      return `${e.good} de ${e.n} días bien · ${b} · ${e.nb} vecinas`;
+    };
+    const dots = e => (e.series || []).map(s => s
+      ? `<span class="er-d ${s[3] ? "ok" : "bad"}" title="${s[0].split("-").reverse().join("/")}: ${num(s[1])} frente a ${num(s[2])} ${RVAR[e.var][1]} de sus vecinas"></span>`
+      : `<span class="er-d" title="sin comparar"></span>`).join("");
+    $("#er-list").innerHTML = items.slice(0, 400).map(({ id, st, e }, i) => {
+      const [txt, cls] = RVERD[e.verdict] || [e.verdict, ""];
+      return `<li data-i="${i}" class="eq-item"><div style="flex:1">
+        <span class="r-name">${esc(st.name)}</span><span class="r-meta">${NETS[st.src] || st.src} · ${esc(id)} · ${RVAR[e.var][0]} deficiente</span>
+        <div class="eq-flag er-${cls || "none"}"><span class="small"><span class="badge ${cls}">${txt}</span>${e.frozen ? " · serie congelada" : ""}</span>
+          ${e.n ? `<span class="r-meta">${stats(e)}</span><span class="er-dots">${dots(e)}</span>` : ""}
+          <div class="ed-btns"><button class="btn sm${e.verdict === "ok" ? "" : " ghost"}" data-a="clear">Quitar «Deficiente» de la ${RVAR[e.var][0]}</button></div></div>
+      </div><button class="btn ghost sm" data-a="see">Ver</button></li>`;
+    }).join("");
+    $$("#er-list li").forEach(li => {
+      const { id, st, e } = items[+li.dataset.i];
+      li.querySelector("[data-a=see]").addEventListener("click", () => {
+        const s = BYID.get(id);
+        if (s) { map.flyTo([s.lat, s.lon], 12); openStation(id, false); }
+      });
+      li.querySelector("[data-a=clear]").addEventListener("click", () => {
+        addChange({ type: "update", id, label: `${st.name}: ${RVAR[e.var][0]} ya no deficiente (${e.good}/${e.n} días bien)`, fields: { [e.qcol]: "" } });
+        renderRehab();
+      });
     });
   }
 
