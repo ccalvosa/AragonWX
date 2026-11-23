@@ -363,7 +363,8 @@ def main():
         except Exception as e:
             log(f"  Récords: ERROR {type(e).__name__}: {e}")
     # ---- revisión de las variables deficientes (¿vuelven a coincidir con sus vecinas?)
-    if closed or state.get("rehab_day") != today or not (out / "rehab.json").exists():
+    if (closed or state.get("rehab_day") != today or not (out / "rehab.json").exists()
+            or state.get("qc_bias", {}).get("day") != today):
         try:
             from . import rehab
             rh = rehab.compute(a.history_dir, today)
@@ -372,6 +373,14 @@ def main():
             log(f"  Deficientes: {rh['n_ok']} variables parecen recuperadas")
         except Exception as e:
             log(f"  Deficientes: ERROR {type(e).__name__}: {e}")
+        # sesgo sistemático de las demás (lo mezcla el control de calidad en cada pasada)
+        try:
+            from . import rehab
+            bf = rehab.bias(a.history_dir, today)
+            state["qc_bias"] = {"day": today, "flags": bf}
+            log(f"  Sesgo sistemático: {sum(len(v) for v in bf.values())} avisos en {len(bf)} estaciones")
+        except Exception as e:
+            log(f"  Sesgo sistemático: ERROR {type(e).__name__}: {e}")
 
     # ---- avisos de AEMET (cada 30 min; si fallan se conservan los anteriores)
     key = __import__("os").environ.get("AEMET_API_KEY")

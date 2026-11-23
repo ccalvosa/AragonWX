@@ -1066,7 +1066,7 @@ async function showQC(id) {
   const q = await loadQC(), box = $("#qc-box");
   const e = q?.stations?.[id];
   if (!box || !e || S.sel !== id) return;
-  box.innerHTML = e.flags.map(f => `<span class="qc-flag" title="Detectado en ${f.today} pasadas hoy · ${f.days} días esta semana">⚠ ${esc(f.msg)}</span>`).join("");
+  box.innerHTML = e.flags.map(f => `<span class="qc-flag" title="${f.daily ? esc(f.meta) : `Detectado en ${f.today} pasadas hoy · ${f.days} días esta semana`}">⚠ ${esc(f.msg)}</span>`).join("");
 }
 
 /* ---------- previsión (Open-Meteo) */

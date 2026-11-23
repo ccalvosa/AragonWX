@@ -18,6 +18,9 @@ Pruebas
 Para no molestar con casos puntuales, un aviso solo se sugiere si se repite al menos
 SUGGEST_PASSES pasadas hoy (≈ 1 h) o en ≥ 2 días de la última semana.
 
+Una vez al día se añaden los avisos de sesgo sistemático de rehab.bias() (comparación
+con las vecinas en los últimos 14 días cerrados), que build.py guarda en state["qc_bias"].
+
 Se ignoran las variables ya marcadas como «Deficiente» y las que lleven en las notas
 de la estación «qc-ignore=ta,pr,…» (lo que pone el botón «Descartar» del editor).
 """
@@ -191,4 +194,15 @@ def run(rows, state, now, today):
             r = byid[sid]
             doc[sid] = {"name": r["name"], "src": r["src"], "flags": out}
             public[sid] = [f["code"] for f in out]
+    # sesgo sistemático (diario); se respeta lo marcado o descartado desde entonces
+    for sid, fl in (state.get("qc_bias", {}).get("flags") or {}).items():
+        if sid not in byid:
+            continue
+        i = next(i for i, r in enumerate(ok) if r["id"] == sid)
+        fl = [f for f in fl if f["var"] not in ign[i] and (ok[i].get("q") or "----")[QPOS[f["var"]]] != "D"]
+        if not fl:
+            continue
+        r = byid[sid]
+        doc.setdefault(sid, {"name": r["name"], "src": r["src"], "flags": []})["flags"].extend(fl)
+        public.setdefault(sid, []).extend(f["code"] for f in fl)
     return {"n": len(doc), "stations": doc}, public

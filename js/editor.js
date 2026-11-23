@@ -256,14 +256,15 @@ const Editor = (() => {
     return m ? notes.replace(m[0], tok) : (notes ? notes + " " : "") + tok;
   }
   async function renderQC() {
-    $("#ed-body").innerHTML = `<p class="hint">Estaciones que se apartan de sus vecinas de forma repetida (al menos 1 h hoy o
-      varios días esta semana). <b>Marcar deficiente</b> oculta esa variable en el mapa; <b>Descartar</b> deja de avisar
+    $("#ed-body").innerHTML = `<p class="hint">Estaciones que se apartan de sus vecinas de forma repetida: en directo (al menos
+      1 h hoy o varios días esta semana) o siempre hacia el mismo lado en los últimos 14 días cerrados (<b>sesgo</b>). <b>Marcar deficiente</b> oculta esa variable en el mapa; <b>Descartar</b> deja de avisar
       de esa variable en esta estación.</p><p class="st-status" id="eq-info">Cargando…</p><ul class="ed-sugg" id="eq-list"></ul>`;
     let q;
     try { q = await getJSON(DATA_URL + "qc.json" + bust()); }
     catch { $("#eq-info").textContent = "Todavía no hay resultados del control de calidad."; return; }
     const done = new Set(pending.map(p => p.id));
-    const score = e => Math.max(...e.flags.map(f => f.days * 100 + f.today));
+    // los de sesgo (14 días) van primero: son los más sólidos
+    const score = e => Math.max(...e.flags.map(f => (f.daily ? 1e4 + f.n : f.days * 100 + f.today)));
     const items = Object.entries(q.stations).filter(([id]) => !done.has(id)).sort((a, b) => score(b[1]) - score(a[1]));
     $("#eq-info").textContent = items.length
       ? `${items.length} estaciones sospechosas · ${new Date(q.generated).toLocaleString("es-ES", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}`
@@ -271,7 +272,7 @@ const Editor = (() => {
     $("#eq-list").innerHTML = items.map(([id, e]) => `<li data-id="${esc(id)}" class="eq-item"><div style="flex:1">
         <span class="r-name">${esc(e.name)}</span><span class="r-meta">${NETS[e.src] || e.src} · ${esc(id)}</span>
         ${e.flags.map((f, i) => `<div class="eq-flag"><span class="small">⚠ ${esc(f.msg)}</span>
-          <span class="r-meta">${f.today} pasadas hoy · ${f.days} ${f.days === 1 ? "día" : "días"} esta semana</span>
+          <span class="r-meta">${f.daily ? `<span class="eq-tag">Sesgo</span> ${esc(f.meta)}` : `${f.today} pasadas hoy · ${f.days} ${f.days === 1 ? "día" : "días"} esta semana`}</span>
           <div class="ed-btns">${f.qcol ? `<button class="btn sm" data-a="bad" data-i="${i}">Marcar ${VNAME[f.var]} deficiente</button>` : ""}
           <button class="btn ghost sm" data-a="skip" data-i="${i}">Descartar</button></div></div>`).join("")}
       </div><button class="btn ghost sm" data-a="see">Ver</button></li>`).join("");

@@ -255,7 +255,23 @@ aviso en la ficha de la estación.
 - **Racha** muy por encima de las vecinas y **humedad** imposible (≤ 3 %).
 
 Un aviso solo se sugiere si se repite al menos 6 pasadas hoy (≈ 1 h) o en 2 días de la
-última semana. En el editor:
+última semana.
+
+**Sesgo sistemático** (`rehab.bias()`, una vez al día): con el histórico de los últimos 14
+días cerrados se compara cada día la máxima, la mínima, la lluvia y la racha de cada
+estación con la mediana de sus vecinas fiables, y se avisa de las que se apartan siempre
+hacia el mismo lado aunque sea poco (el control en directo solo ve más de 4 °C):
+- máxima ≥ 1,5 °C por encima (sensor al sol) o ≥ 2 °C por debajo; mínima ≥ 2 °C por encima
+  (pared, ciudad) o ≥ 2,5 °C por debajo; en ≥ 8 días y el 80 % de ellos hacia ese lado. Si
+  la estación está a ≥ 100 m de la altitud media de sus vecinas, se dice en el aviso;
+- lluvia: en ≥ 4 días de lluvia (≥ 10 mm en las vecinas) recoge menos del 60 % o más
+  del 170 %, o nada (pluviómetro atascado o que no tiene);
+- racha: en ≥ 5 días de viento, la mitad o menos que sus vecinas o más del doble;
+- máxima o mínima congelada (casi siempre el mismo valor).
+Se guarda en el estado (`qc_bias`) y cada pasada lo añade a `qc.json` (con `daily: true`),
+sin las variables ya deficientes o descartadas. En el editor salen con la etiqueta «Sesgo».
+
+En el editor:
 - **Marcar deficiente** pone la calidad de esa variable a *Deficiente*.
 - **Descartar** añade `qc-ignore=<variable>` a las notas de la estación, para no volver a
   avisar de esa variable.

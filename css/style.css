@@ -456,6 +456,8 @@ body.side-wide .leaflet-bottom.leaflet-right { margin-right: calc(min(920px, 100
   box-shadow: var(--shadow); padding: 0.15rem 0.5rem; font-size: 0.76rem; font-weight: 700; font-variant-numeric: tabular-nums;
 }
 .arome-canvas { position: absolute; left: 0; top: 0; opacity: 0.6; pointer-events: none; }
+.eq-tag { display: inline-block; padding: 0 0.4em; margin-right: 0.3em; border-radius: 4px; font-size: 0.72rem;
+  font-weight: 600; background: var(--accent-soft); color: var(--accent); }
 .tm-range { display: flex; align-items: center; gap: 0.5rem; font-size: 0.84rem; padding: 0.18rem 0; }
 .tm-range input { flex: 1; min-width: 0; accent-color: var(--accent); }
 .tm-range span { min-width: 2.8em; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted, inherit); }
