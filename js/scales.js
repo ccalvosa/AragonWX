@@ -36,6 +36,11 @@ const SCALES = {
     [100, "#3d0a5c"], [75, "#6a1b9a"], [50, "#9c3fc4"], [40, "#c86ee0"], [30, "#163c96"], [20, "#1f58b8"],
     [15, "#2f75d0"], [10, "#4a93e0"], [5, "#6aaeea"], [2, "#8cc2f0"], [1, "#a9d3f4"], [0.5, "#c2e0f7"],
     [0.2, "#d9ecfa"]] },
+  // cota de nieve (m): más intenso cuanto más baja
+  cota: { below: "#4a148c", stops: [
+    [3500, "#f4e1d2"], [3000, "#f6c49a"], [2500, "#f3a86b"], [2200, "#e9d36a"], [1900, "#b9dd7a"],
+    [1600, "#7fd0a8"], [1300, "#4fc3d9"], [1000, "#3b97e0"], [800, "#3a6fd8"], [600, "#4b4fc4"],
+    [400, "#6a35b0"], [200, "#82269c"], [0, "#5e1a7e"]] },
   // reflectividad del radar (dBZ); por debajo de 5, transparente
   dbz: { below: "#e9ecef", stops: [
     [70, "#ffffff"], [65, "#9854c6"], [60, "#f800fd"], [55, "#bc0000"], [50, "#d40000"], [45, "#fd0000"],

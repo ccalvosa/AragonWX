@@ -17,8 +17,13 @@ const Arome = (() => {
     pacc: { label: "Lluvia acumulada desde el inicio", unit: "mm", scale: "prec", dec: 1, dec0: c => (c / 16) ** 2, min: 0.1 },
     gust: { label: "Racha máxima en la hora", unit: "km/h", scale: "wind", dec: 0, dec0: c => c, min: -1 },
     snow: { label: "Nieve acumulada desde el inicio", unit: "cm", scale: "snow", dec: 1, dec0: c => (c / 25) ** 2, min: 0.2 },
+    cota: { label: "Cota de nieve si precipita (calculada a 2,5 km)", unit: "m", scale: "cota", dec: 0, dec0: c => c * 20, min: -1 },
     t2m:  { label: "Temperatura a 2 m", unit: "°C", scale: "temp", dec: 1, dec0: c => c / 2.5 - 40, min: -99 },
   };
+  /* opacidad del campo (deja ver el mapa de fondo), recordada en este navegador */
+  const OP_KEY = "aragonwx-arome-op";
+  let opacity = 60;
+  try { const o = +localStorage.getItem(OP_KEY); if (o >= 20 && o <= 100) opacity = o; } catch {}
   const SUB = 8;   // subdivisiones de la tabla de color por cada código (interpolación fina)
   let M = null, v = "pr1", field = null, current = null;
   const cache = new Map();   // "var:h" -> Promise<Uint8Array>
@@ -51,6 +56,7 @@ const Arome = (() => {
       this._map = map;
       this._cv = L.DomUtil.create("canvas", "arome-canvas leaflet-zoom-hide");
       map.getPane("interp").appendChild(this._cv);
+      this._cv.style.opacity = opacity / 100;
       map.on("moveend zoomend resize viewreset", this._draw, this);
       map.on("zoomstart", this._hide, this);
       this._draw();
@@ -224,13 +230,23 @@ const Arome = (() => {
     const val = valueAt(e.latlng.lat, e.latlng.lng);
     if (val == null) { tip.hidden = true; return; }
     const d = VARS[v];
-    tip.textContent = `AROME ${fmt(d.scale === "temp" ? val : Math.max(val, 0), d.dec)} ${d.unit}`;
+    tip.textContent = v === "cota" && val < 20 ? "AROME: nieve hasta el suelo si precipita"
+      : `AROME ${fmt(d.scale === "temp" ? val : Math.max(val, 0), d.dec)} ${d.unit}`;
     tip.style.left = e.containerPoint.x + 14 + "px";
     tip.style.top = e.containerPoint.y - 10 + "px";
     tip.hidden = false;
   });
   map.on("mouseout", () => (tip.hidden = true));
   $("#arome-hide").addEventListener("change", applyHide);
+  const op = $("#arome-op");
+  op.value = opacity;
+  $("#arome-op-v").textContent = opacity + " %";
+  op.addEventListener("input", () => {
+    opacity = +op.value;
+    $("#arome-op-v").textContent = opacity + " %";
+    if (field?._cv) field._cv.style.opacity = opacity / 100;
+    try { localStorage.setItem(OP_KEY, String(opacity)); } catch {}
+  });
 
   return { start, stop, show, setVar, legend, current: () => v, active: () => S.anim === "arome" };
 })();

@@ -21,7 +21,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
-<link rel="stylesheet" href="css/style.css?v=20">
+<link rel="stylesheet" href="css/style.css?v=21">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 </head>
@@ -207,10 +207,12 @@
         <button data-v="pr1">Lluvia 1 h</button>
         <button data-v="pacc">Acumulada</button>
         <button data-v="snow">Nieve</button>
+        <button data-v="cota">Cota de nieve</button>
         <button data-v="gust">Racha</button>
         <button data-v="t2m">Temperatura</button>
       </div>
       <div id="arome-mode" class="tm-extra" hidden>
+        <label class="tm-range">Opacidad <input type="range" id="arome-op" min="20" max="100" step="5" aria-label="Opacidad del campo de AROME"> <span id="arome-op-v"></span></label>
         <label class="check"><input type="checkbox" id="arome-hide"> Ocultar las estaciones</label>
         <p class="hint" id="arome-info"></p>
       </div>
@@ -230,11 +232,11 @@
   <div class="loading" id="loading"><div class="spinner"></div><span>Cargando estaciones…</span></div>
 </main>
 
-<script src="js/scales.js?v=6"></script>
+<script src="js/scales.js?v=7"></script>
 <script src="js/kriging.js?v=4"></script>
 <script src="js/forecast.js?v=3"></script>
-<script src="js/app.js?v=28"></script>
-<script src="js/arome.js?v=8"></script>
+<script src="js/app.js?v=29"></script>
+<script src="js/arome.js?v=10"></script>
 <script src="js/radar.js?v=6"></script>
 <script src="js/aemethist.js?v=3"></script>
 <script src="js/avisos.js?v=2"></script>

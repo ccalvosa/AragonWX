@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=18">
+<link rel="stylesheet" href="css/style.css?v=21">
 </head>
 <body class="page">
 <header class="topbar">
@@ -115,7 +115,10 @@
     <h2>Previsión</h2>
     <ul>
       <li><b>Mapas de AROME:</b> modelo AROME de Météo-France a 0,01° (1,3 km), cada 3 horas, hasta 51 horas. Se muestra en su
-        rejilla original, sin interpolar: lluvia en 1 hora y acumulada, nieve acumulada (en cm, suponiendo 1 cm por cada litro), racha máxima y temperatura a 2 m.</li>
+        rejilla original, sin interpolar: lluvia en 1 hora y acumulada, nieve acumulada (en cm, suponiendo 1 cm por cada litro), cota de nieve, racha máxima y temperatura a 2 m.
+        La cota de nieve es la altura a la que el termómetro húmedo marca +1 °C, calculada con la temperatura y la humedad
+        por niveles de presión de AROME a 2,5 km: es la cota que habría <i>si precipita</i>, porque con aire seco la evaporación
+        enfría y la nieve baja mucho más que la isoterma de 0 °C. Puedes ajustar la opacidad para ver el mapa de debajo.</li>
       <li><b>Meteogramas:</b> para cada estación o cualquier punto del mapa, con <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a>:
         AROME de alta resolución para los primeros días, el modelo determinista IFS de ECMWF hasta 10 días y su conjunto (ENS,
         51 miembros) para ver la incertidumbre. En las estaciones se superponen las observaciones.</li>

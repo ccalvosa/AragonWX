@@ -27,7 +27,8 @@ descarga los datos cada 10 minutos y los publica en la rama `data`.
     AROME e IFS en los últimos 14 días (previsión emitida el día anterior, de la API de
     pasadas anteriores de Open-Meteo) y días de lluvia acertados.
 - **AROME 1,3 km sobre el mapa**: lluvia en 1 h, lluvia acumulada, nieve acumulada
-  (cm, 10:1), racha y temperatura
+  (cm, 10:1), cota de nieve (termómetro húmedo de +1 °C, de los niveles de presión de AROME
+  0,025°), racha y temperatura, con opacidad ajustable
   hora a hora hasta H+51, con animación y el valor de AROME bajo el ratón. Datos
   abiertos de Météo-France (Licence Ouverte 2.0) procesados en Actions y publicados
   en la rama `arome`.
