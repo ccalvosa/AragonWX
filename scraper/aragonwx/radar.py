@@ -10,7 +10,10 @@ De cada fichero se toma la elevación más baja y se guarda en coordenadas polar
   z_AAAAMMDDTHHMM.png  reflectividad: código = (dBZ + 32)·2, 0 = sin eco o sin dato
   v_AAAAMMDDTHHMM.png  velocidad radial: código = v·3 + 128 (m/s, + se aleja), 0 = sin dato
 La web pinta cada píxel de la pantalla con la celda del radar que le corresponde.
-Se conservan las últimas KEEP_H horas y manifest.json las describe.
+Se conservan las últimas KEEP_H horas (24) y manifest.json las describe; la web deja
+elegir cuántas animar. Lo de las últimas FRESH_H horas se baja siempre; lo anterior, como
+mucho BACKFILL ficheros por pasada (el relleno va de la más reciente hacia atrás). Las
+imágenes de largo alcance se guardan una sola vez, en arch/, y los fotogramas apuntan ahí.
 
 Además, con la exploración de largo alcance de las últimas 24 h (carpeta arch/),
 se publica la lluvia estimada de 1, 3, 6, 12 y 24 h, corregida con los pluviómetros:
@@ -37,7 +40,8 @@ ENDPOINTS = [
 ]
 SITE, CC = "espdg", "ES"
 NAME = "Zaragoza (Perdiguera)"
-KEEP_H = 3
+KEEP_H = 24
+FRESH_H = 3
 KEY_RE = re.compile(r"@(\d{8}T\d{4})@[\d._]+@([A-Z_]+)\.h5$")
 UA = {"User-Agent": "AragonWX (estaciones de Aragón; github.com/ccalvosa/AragonWX)"}
 
@@ -130,7 +134,7 @@ def utc(stamp):
 ZMIN_RAIN, ZMAX_RAIN = 7.0, 55.0
 STEP_MIN = 10
 DATA_NOW = "https://raw.githubusercontent.com/ccalvosa/AragonWX/data/now.json"
-BACKFILL = 30            # descargas por pasada para rellenar el archivo de 24 h
+BACKFILL = 30            # descargas por pasada para rellenar lo anterior a FRESH_H
 BIAS_MIN_PAIRS, BIAS_RANGE = 5, (0.25, 4.0)
 # Ecos fijos (montañas, edificios): frecuencia de eco de cada celda con una media
 # exponencial de ~2 días; las celdas con eco más de la mitad del tiempo no suman lluvia.
@@ -197,7 +201,7 @@ def accumulate(ses, pub, man):
         return False
     t_last = utc(files[-1].stem[2:])
     sig = f"{files[-1].stem}:{len(files)}"
-    if man.get("acc", {}).get("sig") == sig:
+    if man.get("acc", {}).get("sig") == sig and "per" in man["acc"]:
         return False
     shape = (geo["nrays"], geo["nbins"])
     acc = {h: np.zeros(shape) for h in PERIODS}
@@ -283,6 +287,9 @@ def run(pub: Path, now=None):
     ses = requests.Session()
     ses.headers.update(UA)
     ep, keys = list_keys(ses, now, hours=25)
+    fresh = (now - dt.timedelta(hours=FRESH_H)).strftime("%Y%m%dT%H%M")
+    geo = man.get("arch_geo")
+    lr_elev = next((f["elev"] for f in reversed(man["frames"]) if f["kind"] == "lr"), 0.5)
     new = backfilled = 0
     for key in sorted(keys, reverse=True):   # de la más reciente hacia atrás (el relleno empieza por la última hora)
         m = KEY_RE.search(key)
@@ -290,10 +297,18 @@ def run(pub: Path, now=None):
             continue
         stamp, qty = m.groups()
         t = utc(stamp).strftime("%Y-%m-%dT%H:%MZ")
-        recent = stamp >= cutoff and t not in have
-        # el archivo de 24 h solo guarda la de largo alcance (sin VRADH)
-        to_arch = "VRADH" not in qty and stamp >= cut24 and not (arch / f"z_{stamp}.png").exists()
-        if not recent and not (to_arch and backfilled < BACKFILL):
+        lr = "VRADH" not in qty   # largo alcance (sin velocidad)
+        apath = arch / f"z_{stamp}.png"
+        frame = stamp >= cutoff and t not in have
+        # largo alcance que ya está en el archivo: el fotograma sale sin descargar nada
+        if frame and lr and geo and apath.exists():
+            man["frames"].append({"t": t, "kind": "lr", "z": f"arch/z_{stamp}.png", **geo, "elev": lr_elev})
+            have.add(t)
+            new += 1
+            continue
+        if not (frame or (lr and stamp >= cut24 and not apath.exists())):
+            continue
+        if stamp < fresh and backfilled >= BACKFILL:
             continue
         try:
             r = ses.get(f"{ep}/{key}", timeout=60)
@@ -302,20 +317,23 @@ def run(pub: Path, now=None):
         except Exception as e:   # un fichero roto no para el resto
             print(f"radar: {key} no se ha podido leer ({e})", file=sys.stderr)
             continue
+        if stamp < fresh:
+            backfilled += 1
         man["site"] = {"id": SITE, "name": NAME, "lat": d["lat"], "lon": d["lon"], "h": d["h"]}
         if d["v"] is None:
-            save_png(d["z"], arch / f"z_{stamp}.png")
-            man["arch_geo"] = {k: d[k] for k in ("nbins", "nrays", "rscale", "rstart", "az0")}
-            if not recent:
-                backfilled += 1
-        if not recent:
+            save_png(d["z"], apath)
+            geo = man["arch_geo"] = {k: d[k] for k in ("nbins", "nrays", "rscale", "rstart", "az0")}
+            lr_elev = d["elev"]
+        if not frame:
             continue
-        save_png(d["z"], pub / f"z_{stamp}.png")
-        fr = {"t": t, "kind": "dop" if d["v"] is not None else "lr", "z": f"z_{stamp}.png",
+        fr = {"t": t, "kind": "dop" if d["v"] is not None else "lr",
               **{k: d[k] for k in ("nbins", "nrays", "rscale", "rstart", "az0", "elev")}}
-        if d["v"] is not None:
+        if d["v"] is None:
+            fr["z"] = f"arch/z_{stamp}.png"
+        else:
+            save_png(d["z"], pub / f"z_{stamp}.png")
             save_png(d["v"], pub / f"v_{stamp}.png")
-            fr["v"] = f"v_{stamp}.png"
+            fr["z"], fr["v"] = f"z_{stamp}.png", f"v_{stamp}.png"
         man["frames"].append(fr)
         have.add(t)
         new += 1
@@ -327,7 +345,9 @@ def run(pub: Path, now=None):
         if p.stem[2:] < cut24:
             p.unlink()
     acc = accumulate(ses, pub, man)
-    used = {f["z"] for f in keep} | {f.get("v") for f in keep} | {man.get("acc", {}).get("h1"), man.get("acc", {}).get("h24"), "clutter.png"}
+    used = ({f["z"] for f in keep} | {f.get("v") for f in keep} | {"clutter.png"}
+            | {v["f"] for v in man.get("acc", {}).get("per", {}).values()}
+            | {man.get("acc", {}).get("h1"), man.get("acc", {}).get("h24")})
     for p in pub.glob("*.png"):
         if p.name not in used:
             p.unlink()
@@ -337,7 +357,7 @@ def run(pub: Path, now=None):
                     "zcode": "dBZ = c/2 - 32", "vcode": "m/s = (c - 128)/3", "keep_h": KEEP_H})
         mpath.write_text(json.dumps(man, separators=(",", ":")))
     last = man["frames"][-1]["t"] if man["frames"] else "ninguna"
-    print(f"radar: {new} nuevas, {gone} retiradas, {backfilled} al archivo de 24 h "
+    print(f"radar: {new} nuevas, {gone} retiradas, {backfilled} descargas de relleno "
           f"({len(list(arch.glob('z_*.png')))} en total), {len(man['frames'])} en la animación, última {last}")
     return changed
 

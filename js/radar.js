@@ -12,6 +12,7 @@
      v   velocidad radial: exploración Doppler
      a1 … a24  lluvia estimada en 1, 3, 6, 12 y 24 h (largo alcance, corregida con pluviómetros)
 
+   La animación muestra las últimas 1, 3, 6, 12 o 24 h (la rama guarda 24 h).
    «Descargar GIF» graba la animación de la vista actual (mapa base, límites de
    provincia, radar, hora y leyenda) con gifenc, que se carga solo al pulsarlo.
 
@@ -32,6 +33,10 @@ const Radar = (() => {
     MODES["a" + h] = { label: `Lluvia estimada en ${h} ${h === 1 ? "hora" : "horas"}`, unit: "mm", scale: h <= 3 ? "prec1h" : "prec", q: h <= 3 ? "a1" : "a24", acc: h };
   const Q = () => MODES[mode].q;
   let M = null, mode = "zh", layer = null, cur = null, token = 0, timer = null, marks = null;
+  /* horas de animación (1, 3, 6, 12 o 24), recordadas en este navegador */
+  const WIN_KEY = "aragonwx-radar-win";
+  let win = 3;
+  try { win = [1, 3, 6, 12, 24].includes(+localStorage.getItem(WIN_KEY)) ? +localStorage.getItem(WIN_KEY) : 3; } catch {}
   const cache = new Map();   // nombre de PNG -> Promise<Uint8Array>
   const tip = document.createElement("div");
   tip.className = "arome-tip"; tip.hidden = true;
@@ -71,7 +76,9 @@ const Radar = (() => {
     if (!M) return [];
     const d = MODES[mode];
     if (d.acc) { const file = accOf(d.acc)?.f; return file ? [{ t: Date.parse(M.acc.t), rf: { ...M.acc, z: file, elev: 0.5 } }] : []; }
-    return M.frames.filter(f => f.kind === d.kind && (d.q === "z" || f.v)).map(f => ({ t: Date.parse(f.t), rf: f }));
+    const all = M.frames.filter(f => f.kind === d.kind && (d.q === "z" || f.v)).map(f => ({ t: Date.parse(f.t), rf: f }));
+    const t0 = (all.at(-1)?.t ?? 0) - win * 3600e3;
+    return all.filter(f => f.t > t0);
   }
   /* acumulado de h horas: {f, n, e} (los manifiestos antiguos solo traen 1 y 24 h) */
   function accOf(h) {
@@ -248,8 +255,11 @@ const Radar = (() => {
     ctx.globalAlpha = 1;
   }
   async function exportGif(btn) {
-    const fr = frames();
+    let fr = frames();
     if (!fr.length) return toast("No hay imágenes del radar para grabar.");
+    // ventanas largas: como mucho 48 imágenes (una de cada 2, 3…), terminando en la última
+    const step = Math.ceil(fr.length / 48);
+    if (step > 1) fr = fr.filter((_, i) => (fr.length - 1 - i) % step === 0);
     const old = btn.textContent;
     btn.disabled = true; btn.textContent = "Preparando el GIF…";
     try {
@@ -369,10 +379,15 @@ const Radar = (() => {
     tip.hidden = true;
     $("#radar-mode").hidden = true;
   }
+  function setWin(h) {
+    win = h;
+    try { localStorage.setItem(WIN_KEY, String(h)); } catch {}
+    if (M) preload();
+  }
   function setMode(m) {
     mode = m;
     if (M) preload();
   }
 
-  return { start, stop, show, frames, setMode, exportGif, ready: () => !!M, mode: () => mode, MODES };
+  return { start, stop, show, frames, setMode, setWin, exportGif, ready: () => !!M, mode: () => mode, win: () => win, MODES };
 })();

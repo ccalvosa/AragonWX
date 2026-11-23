@@ -56,7 +56,8 @@ descarga los datos cada 10 minutos y los publica en la rama `data`.
 - **Radar de Zaragoza** (AEMET, Perdiguera) desde EUMETNET OPERA (CC BY 4.0):
   reflectividad de alta resolución (exploración Doppler, 500 m hasta 150 km), de
   baja resolución (largo alcance, 1 km hasta 250 km) y velocidad radial, de la
-  elevación más baja; cada producto, una imagen cada 10 min; últimas 3 horas. `scraper/aragonwx/radar.py` y el flujo `update-radar`
+  elevación más baja; cada producto, una imagen cada 10 min; se guardan 24 h y en la web
+  se elige animar las últimas 1, 3, 6, 12 o 24 h. `scraper/aragonwx/radar.py` y el flujo `update-radar`
   (bucle de 1 min) la publican en la rama `radar`; la web pinta cada píxel con su
   celda del radar, sin estirar ni suavizar.
   **Lluvia estimada** de 1, 3, 6, 12 y 24 h con la exploración de largo alcance (24 h guardadas
@@ -65,6 +66,7 @@ descarga los datos cada 10 minutos y los publica en la rama `data`.
   con un único factor frente a los pluviómetros de AEMET (lluvia de 24 h de `now.json`).
   **Descargar GIF** graba en el navegador la animación de la vista actual (mapa base,
   límites, radar, hora y leyenda) con [gifenc](https://github.com/mattdesl/gifenc).
+  Con ventanas largas se queda en 48 imágenes como mucho (una de cada 2, 3…).
 - **Krigeado** a resolución de pantalla en cada zoom. En temperatura (actual, máxima
   y mínima) tiene en cuenta la altitud: se ajusta a las estaciones una recta con la
   altitud, o dos tramos si hay inversión (la leyenda muestra el gradiente), se krigean

@@ -771,6 +771,11 @@ function initToolMenus() {
   }
   $("#radar-hide").addEventListener("change", applyHide);
   $("#radar-gif").addEventListener("click", e => Radar.exportGif(e.currentTarget));
+  $$("#radar-win button").forEach(b => b.addEventListener("click", () => {
+    Radar.setWin(+b.dataset.w);
+    if (S.layers.radar) refreshTimebar(true);
+    syncTools();
+  }));
   syncTools();
 }
 const SATNAME = { ir: "Infrarrojo", vis: "Visible", geo: "GeoColor" };
@@ -779,7 +784,10 @@ function syncTools() {
   if (!$("#btn-radar")) return;
   const rm = S.layers.radar ? Radar.mode() : "off", sm = S.layers.sat ? S.sat : "off", am = S.layers.arome ? Arome.current() : "off";
   const mark = (box, v) => $$(box + " button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
-  mark("#radar-opts", rm); mark("#radar-acc", rm); mark("#sat-opts", sm); mark("#model-opts", am);
+  mark("#radar-opts", rm); mark("#radar-acc", rm);
+  const rw = typeof Radar === "undefined" ? 3 : Radar.win();   // syncTools corre antes de cargar radar.js
+  $$("#radar-win button").forEach(b => b.classList.toggle("on", +b.dataset.w === rw));
+  $("#radar-winbox").hidden = rm.startsWith("a"); mark("#sat-opts", sm); mark("#model-opts", am);
   const state = (btn, on, txt) => { $(btn).classList.toggle("on", on); $(btn + " .tool-state").textContent = txt; };
   state("#btn-radar", rm !== "off", ({ zh: "alta resolución", zl: "baja resolución", v: "velocidad" }[rm] || (rm.startsWith("a") ? `lluvia ${rm.slice(1)} h` : "")));
   state("#btn-sat", sm !== "off" || !!S.layers.li, [sm !== "off" && SATNAME[sm].toLowerCase(), S.layers.li && "rayos"].filter(Boolean).join(" + "));
@@ -821,7 +829,8 @@ function showFrame(i) {
   if (S.anim === "arome") return Arome.show(TB.i);
   const f = TB.frames[TB.i];
   if (!f) return;
-  $("#tb-label").textContent = new Date(f.t).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) + (f.nowcast ? " (previsión)" : "");
+  const long = TB.frames.at(-1).t - TB.frames[0].t > 6 * 3600e3;   // ventanas largas: con el día
+  $("#tb-label").textContent = new Date(f.t).toLocaleString("es-ES", long ? { weekday: "short", hour: "2-digit", minute: "2-digit" } : { hour: "2-digit", minute: "2-digit" }) + (f.nowcast ? " (previsión)" : "");
   if (S.layers.radar && f.rf) Radar.show(f.rf);
   const satT = new Date(Math.min(f.t, Date.now() - 20 * 60e3) - (Math.min(f.t, Date.now() - 20 * 60e3) % 600e3)).toISOString().slice(0, 19) + "Z";
   if (S.layers.sat) {
@@ -855,7 +864,7 @@ $("#tb-play").addEventListener("click", () => {
     TB.i = (TB.i + 1) % n;
     $("#tb-range").value = TB.i;
     showFrame(TB.i);
-  }, S.anim === "obs10" ? 350 : S.anim === "arome" ? 650 : 700);
+  }, S.anim === "obs10" ? 350 : S.anim === "arome" ? 650 : Math.max(150, Math.min(700, 12600 / TB.frames.length)));   // radar: ~13 s la vuelta si hay muchas
 });
 
 /* animación de las observaciones diezminutales de AEMET */
