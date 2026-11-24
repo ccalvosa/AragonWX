@@ -974,7 +974,7 @@ LETL,WC,Teruel Aeropuerto,Teruel,40.41167,-1.21750,1014,https://app.weathercloud
 6599395779,WC,Actur Blas de Otero,Zaragoza,41.67030,-0.88360,202,https://app.weathercloud.net/d6599395779#current,FroggitHPseries,,,,,,,,1
 2874842613,WC,Aguilón,Zaragoza,41.29194,-1.02750,751,https://app.weathercloud.net/d2874842613#current,,,,,,,,,1
 9114813183,WC,Alagon Wc,Zaragoza,41.76812,-1.11782,283,https://app.weathercloud.net/d9114813183#current,,,,,,,,,1
-2180452871,WC,Alpartir,Zaragoza,41.42110,-1.38220,511,https://app.weathercloud.net/d2180452871#current,,,,,,,,,1
+2180452871,WC,Alpartir,Zaragoza,41.42110,-1.38220,511,https://app.weathercloud.net/d2180452871#current,,,Deficiente,Deficiente,Deficiente,Deficiente,,,1
 7430514904,WC,Anento,Zaragoza,41.06860,-1.33500,929,https://app.weathercloud.net/d7430514904#current,,,,,,,,,1
 6084163424,WC,B.Jesus A.Cataluna,Zaragoza,41.66080,-0.86810,197,https://app.weathercloud.net/d6084163424#current,SainlogicWSSeries,,,,,,,,1
 3663583050,WC,B.Jesus P.De la Ribera 2,Zaragoza,41.65710,-0.86890,203,https://app.weathercloud.net/d3663583050#current,Bresser5-in-1,Maxima por encima de lo normal,,,,,,,1
@@ -1019,7 +1019,7 @@ LEBR,WC,Las Bardenas Reales,Zaragoza,42.11970,-1.26000,314,https://app.weathercl
 6959741961,WC,Torralba de Ribota,Zaragoza,41.41860,-1.68470,661,https://app.weathercloud.net/d6959741961#current,,,,,,,,,1
 6967696049,WC,Torrecilla de Valmadrid,Zaragoza,41.53940,-0.81500,328,https://app.weathercloud.net/d6967696049#current,DavisVantageVue,,,,,,,,1
 6807434075,WC,Undues Pintano,Zaragoza,42.53750,-1.04500,662,https://app.weathercloud.net/d6807434075#current,,,,,,,,,1
-2402697176,WC,Universidad Eduardo Ibarra,Zaragoza,41.63700,-0.90320,232,https://app.weathercloud.net/d2402697176#current,Bresser7-in-1,Tambien en WU IZARAG158. Datos precipitacion muy infraestimados.,,,,,,,1
+2402697176,WC,Universidad Eduardo Ibarra,Zaragoza,41.63700,-0.90320,232,https://app.weathercloud.net/d2402697176#current,Bresser7-in-1,Tambien en WU IZARAG158. Datos precipitacion muy infraestimados.,Deficiente,Deficiente,Deficiente,Deficiente,,,1
 9982110869,WC,Villarroya de la Sierra,Zaragoza,41.46440,-1.78470,755,https://app.weathercloud.net/d9982110869#current,,,,,,,,,1
 9781472430,WC,Zuera Wc,Zaragoza,41.87190,-0.78920,290,https://app.weathercloud.net/d9781472430#current,,,,,,,,,1
 IABIEG3,WU,Abiego,Huesca,42.16500,-0.03500,539,https://www.wunderground.com/dashboard/pws/IABIEG3,,,,,,,,,1
