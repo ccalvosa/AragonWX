@@ -874,7 +874,7 @@ SIAR_Zuera,SIAR,Zuera Siar,Zaragoza,41.88850,-0.76620,288,https://servicio.mapa.
 5055670485,WC,Arbanies,Huesca,42.16220,-0.24810,597,https://app.weathercloud.net/d5055670485#current,,,,,,,,,1
 2369725015,WC,Arcusa Hotel Tierra Buxo,Huesca,42.32030,0.07720,867,https://app.weathercloud.net/d2369725015#current,,,,,,,,,1
 6205068355,WC,Arguis,Huesca,42.31390,-0.43580,1026,https://app.weathercloud.net/d6205068355#current,,,,,,,,,1
-1727891814,WC,Artasona del Llano,Huesca,42.00280,-0.57690,386,https://app.weathercloud.net/d1727891814#current,,,,,,Deficiente,,,1
+1727891814,WC,Artasona del Llano,Huesca,42.00280,-0.57690,386,https://app.weathercloud.net/d1727891814#current,,,,,Deficiente,Deficiente,,,1
 116961689,WC,Aso de Sobremonte,Huesca,42.63140,-0.36420,1262,https://app.weathercloud.net/d0116961689#current,,,,,,,,,1
 8379796250,WC,Barbastro Norte,Huesca,42.05000,0.12330,353,https://app.weathercloud.net/d8379796250#current,,,,,,,,,1
 3763052871,WC,Barbastro Rio Vero,Huesca,42.03810,0.12110,336,https://app.weathercloud.net/d3763052871#current,,,,,,,,,1
@@ -1714,3 +1714,4 @@ ISANTA2472,WU,Santa Cruz de la Serós,Huesca,42.52474,-0.67702,260,https://www.w
 IBAILO3,WU,Arbués,Huesca,42.50695,-0.78310,768,https://www.wunderground.com/dashboard/pws/IBAILO3,,,,,,,,,1
 ICALDE85,WU,Aquilué,Huesca,42.38081,-0.48951,209,https://www.wunderground.com/dashboard/pws/ICALDE85,,,,,,,,,1
 ILUNA6,WU,Luna,Zaragoza,42.16882,-0.93083,145,https://www.wunderground.com/dashboard/pws/ILUNA6,,,,,,,,,1
+IBELCH12,WU,Belchite,Zaragoza,41.30900,-0.75000,130,https://www.wunderground.com/dashboard/pws/IBELCH12,,,,,,,,,1
