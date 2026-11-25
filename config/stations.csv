@@ -1507,7 +1507,7 @@ IMALAN56,WU,Malanquilla,Zaragoza,41.57600,-1.86400,1050,https://www.wunderground
 IMALON20,WU,Malón,Zaragoza,41.95302,-1.67230,425,https://www.wunderground.com/dashboard/pws/IMALON20,,,,,,Deficiente,,,1
 IMEDIA5,WU,Mediana de Aragon,Zaragoza,41.46659,-0.71083,298,https://www.wunderground.com/dashboard/pws/IMEDIA5,,Tambien EW,,,,,,,1
 IZARAG9,WU,Miralbueno,Zaragoza,41.65800,-0.92400,205,https://www.wunderground.com/dashboard/pws/IZARAG9,,,,,Deficiente,,,,1
-IZARAG186,WU,Miralbueno Estanés,Zaragoza,41.65900,-0.93300,228,https://www.wunderground.com/dashboard/pws/IZARAG186,,,Deficiente,,,,,,1
+IZARAG186,WU,Miralbueno Estanés,Zaragoza,41.65900,-0.93300,228,https://www.wunderground.com/dashboard/pws/IZARAG186,,,Deficiente,,Deficiente,,,,1
 IZARAG178,WU,Miralbueno Marboré,Zaragoza,41.66200,-0.93300,228,https://www.wunderground.com/dashboard/pws/IZARAG178,,,Deficiente,,,,,,1
 IZARAG111,WU,Montanana C Iglesia,Zaragoza,41.68420,-0.82520,214,https://www.wunderground.com/dashboard/pws/IZARAG111,,,Deficiente,,,,,,1
 IZARAG118,WU,Montecanal Sombrerodecopa,Zaragoza,41.62600,-0.93700,261,https://www.wunderground.com/dashboard/pws/IZARAG118,,También en EW,Deficiente,,Deficiente,,,,1
@@ -1601,7 +1601,7 @@ IZARAG218,WU,ZaragozaTiernoGalvan,Zaragoza,41.62927,-0.87509,238,https://www.wun
 IZUERA8,WU,Zuera,Zaragoza,41.80250,-0.81570,292,https://www.wunderground.com/dashboard/pws/IZUERA8,,,Deficiente,,,,,,1
 IPILA8,WU,Épila Sur,Zaragoza,41.58313,-1.28202,336,https://www.wunderground.com/dashboard/pws/IPILA8,,,,,,,,,1
 ICUEVA35,WU,Cuevas Labradas,Teruel,40.45448,-1.05080,332,https://www.wunderground.com/dashboard/pws/ICUEVA35,,,,,,,,,1
-IZARAG239,WU,Actur-Rey Fernando,Zaragoza,41.67072,-0.89442,63,https://www.wunderground.com/dashboard/pws/IZARAG239,,,,,,,,,1
+IZARAG239,WU,Actur-Rey Fernando,Zaragoza,41.67072,-0.89442,63,https://www.wunderground.com/dashboard/pws/IZARAG239,,,,,Deficiente,,,,1
 IZARAG242,WU,Zaragoza,Zaragoza,41.63300,-0.94400,75,https://www.wunderground.com/dashboard/pws/IZARAG242,,,,,,,,,1
 IPLASE23,WU,Plasencia de Jalón,Zaragoza,41.68207,-1.22996,275,https://www.wunderground.com/dashboard/pws/IPLASE23,,,,,,,,,1
 IALMON50,WU,Almonacid de la Sierra,Zaragoza,41.39829,-1.32676,187,https://www.wunderground.com/dashboard/pws/IALMON50,,,,,,,,,1
