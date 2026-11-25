@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=22">
+<link rel="stylesheet" href="css/style.css?v=23">
 </head>
 <body class="page">
 <header class="topbar">
@@ -82,6 +82,9 @@
       <li><b>Krigeado:</b> interpolación por krigeado ordinario (variograma exponencial) de las estaciones de Aragón, recortada a la
         comunidad. Antes se agrupan las estaciones en celdas de unos 8 km (mediana), para que las ciudades no dominen, y se quitan
         las que se separan mucho de sus vecinas. Se recalcula a la resolución de la pantalla en cada zoom.</li>
+      <li><b>Lluvia con nieve:</b> los pluviómetros de aficionado no son calefactados y con nieve marcan poco o nada. En lluvia
+        se dejan fuera los que han estado por encima de la cota de nieve de AROME (o a 1 °C o menos) y han recogido menos de la
+        mitad que sus vecinas sin nieve. La leyenda dice cuántos se han quitado (pasa el ratón para ver cuáles).</li>
       <li><b>Temperatura con altitud:</b> en temperatura se ajusta cada vez una recta de temperatura frente a altitud con las
         estaciones (o dos tramos, si mejora claramente, para recoger inversiones), se krigea lo que la recta no explica y en cada
         punto se suma la recta con la altitud del modelo digital del terreno (unos 250 m). La leyenda muestra el gradiente ajustado.

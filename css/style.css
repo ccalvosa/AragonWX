@@ -481,6 +481,12 @@ body.hide-stations .leaflet-marker-pane { display: none; }
 .ed-sugg li { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.4rem 0.45rem; border-radius: var(--radius-sm); }
 .ed-sugg li:hover { background: var(--accent-soft); }
 .ed-sugg .badge { display: inline-block; margin-top: 0.15rem; }
+.ed-savebar { display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 0.95rem; border-top: 1px solid var(--border);
+  background: var(--accent-soft); font-size: 0.84rem; font-weight: 600; flex: none; }
+.ed-savebar[hidden] { display: none; }
+.ed-savebar span { flex: 1; }
+.eq-flag.eq-done { border-left-color: #2f9e44; opacity: 0.8; }
+.eq-all { margin-top: 0.4rem; }
 .ed-btns { display: flex; gap: 0.3rem; flex: none; flex-wrap: wrap; }
 .eq-item { align-items: flex-start !important; }
 .er-dots { display: flex; gap: 2px; margin: 0.1rem 0; }

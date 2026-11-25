@@ -117,8 +117,8 @@ const Arome = (() => {
   });
 
   /* ---------- fotogramas ---------- */
-  function frame(key, h) {
-    const k = `${key}:${h}`;
+  function frame(key, h, m = M) {
+    const k = `${m.run}|${key}:${h}`;
     if (cache.has(k)) return cache.get(k);
     const p = new Promise((res, rej) => {
       const img = new Image();
@@ -134,7 +134,7 @@ const Arome = (() => {
         res(codes);
       };
       img.onerror = () => rej(new Error("no se pudo cargar " + k));
-      img.src = `${base()}${key}_${String(h).padStart(2, "0")}.png?r=${encodeURIComponent(M.run)}`;
+      img.src = `${base()}${key}_${String(h).padStart(2, "0")}.png?r=${encodeURIComponent(m.run)}`;
     });
     cache.set(k, p);
     p.catch(() => cache.delete(k));
@@ -248,5 +248,27 @@ const Arome = (() => {
     try { localStorage.setItem(OP_KEY, String(opacity)); } catch {}
   });
 
-  return { start, stop, show, setVar, legend, current: () => v, active: () => S.anim === "arome" };
+  /* Cota de nieve más baja de AROME en cada punto entre t0 y t1 (ms), para el krigeado de la lluvia.
+     Usa la última pasada aunque la capa esté apagada; como mucho 8 horas repartidas por el periodo.
+     Devuelve un array (m o null por punto) o null si no hay AROME. */
+  let MC = null, MCt = 0;
+  async function cotaMin(points, t0, t1) {
+    if (!MC || Date.now() - MCt > 600e3) { MC = await getJSON(base() + "manifest.json" + bust()); MCt = Date.now(); }
+    const m = MC, hs = m.hours?.cota || [], r0 = Date.parse(m.run), at = h => r0 + h * 3600e3;
+    if (!hs.length || m.grid !== "latlon") return null;
+    let sel = hs.filter(h => at(h) >= t0 - 1800e3 && at(h) <= t1 + 1800e3);
+    if (!sel.length) sel = [hs.reduce((a, h) => (Math.abs(at(h) - t1) < Math.abs(at(a) - t1) ? h : a))];
+    if (sel.length > 8) { const k = (sel.length - 1) / 7; sel = [...new Set(Array.from({ length: 8 }, (_, i) => sel[Math.round(i * k)]))]; }
+    const fields = await Promise.all(sel.map(h => frame("cota", h, m)));
+    const [, W0, N0] = m.bbox, st = m.step;
+    return points.map(p => {
+      const ix = Math.round((p.lon - W0) / st), iy = Math.round((N0 - p.lat) / st);
+      if (ix < 0 || ix >= m.w || iy < 0 || iy >= m.h) return null;
+      let mn = Infinity;
+      for (const f of fields) { const c = f[iy * m.w + ix]; if (c !== 255 && c * 20 < mn) mn = c * 20; }
+      return mn === Infinity ? null : mn;
+    });
+  }
+
+  return { start, stop, show, setVar, legend, cotaMin, current: () => v, active: () => S.anim === "arome" };
 })();

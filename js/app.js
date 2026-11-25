@@ -642,28 +642,68 @@ function drawInterp() {
   interpNote("");
   const def = currentDef();
   if (!S.layers.interp || def.hydro || !RINGS) return;
-  const pts = visibleStations().filter(([s]) => s.ar).map(([s, v]) => ({ lat: s.lat, lon: s.lon, alt: s.alt, v }));
+  const pts = visibleStations().filter(([s]) => s.ar).map(([s, v]) => ({ lat: s.lat, lon: s.lon, alt: s.alt, v, s }));
   const kind = def.scale === "temp" ? "temp" : def.scale?.startsWith("prec") ? "prec" : def.scale === "wind" ? "wind" : def.scale === "hum" ? "hum" : "days";
   const token = (drawInterp.n = (drawInterp.n || 0) + 1);
   // temperatura: se espera al modelo del terreno (una sola descarga); si falla, krigeado sin altitud
-  const ready = kind === "temp" ? Interp.loadDEM().catch(e => console.warn("DEM", e)) : Promise.resolve();
+  // lluvia en directo: fuera los pluviómetros que han estado en la nieve (ver snowGauges)
+  let snowOut = [];
+  const ready = kind === "temp" ? Interp.loadDEM().catch(e => console.warn("DEM", e))
+    : kind === "prec" && S.mode !== "hist" ? snowGauges(pts, S.v).then(o => { snowOut = o; }).catch(e => console.warn("cota de nieve", e))
+    : Promise.resolve();
   ready.then(() => setTimeout(() => {
     if (token !== drawInterp.n) return;   // ya se pidió otro dibujo
     const t0 = performance.now();
-    const mod = Interp.fit(pts, { scale: def.scale, kind });
+    const mod = Interp.fit(snowOut.length ? pts.filter(p => !snowOut.includes(p)) : pts, { scale: def.scale, kind });
     if (!mod) return toast("No hay estaciones suficientes para interpolar.");
     interpLayer && map.removeLayer(interpLayer);
     interpLayer = new Interp.Layer(mod, RINGS, { opacity: 0.62, unit: def.unit, dec: def.scale === "wind" || def.scale === "hum" ? 0 : 1 }).addTo(map);
-    interpNote(mod.trend ? `Krigeado con altitud: ${mod.note}` : "");
+    interpNote(mod.trend ? `Krigeado con altitud: ${mod.note}`
+      : snowOut.length ? `Krigeado sin ${snowOut.length} ${snowOut.length === 1 ? "pluviómetro" : "pluviómetros"} en la nieve (por encima de la cota de AROME y por debajo de sus vecinas)` : "",
+      snowOut.map(p => `${p.s.name} (${Math.round(p.s.alt)} m): ${fmt(p.v, 1)} mm`).join("\n"));
     console.info(`krigeado: ${mod.n} puntos en ${Math.round(performance.now() - t0)} ms${mod.trend ? " · " + mod.note : ""}`);
   }, 30));
 }
 /* nota bajo la leyenda (gradiente con la altitud ajustado) */
-function interpNote(txt) {
+function interpNote(txt, title = "") {
   let el = $("#lg-interp");
   if (!txt) { el?.remove(); return; }
   if (!el) { el = document.createElement("div"); el.id = "lg-interp"; el.className = "lg-note"; $("#legend").appendChild(el); }
   el.textContent = txt;
+  el.title = title;
+}
+
+/* Pluviómetros en la nieve. Los de aficionado no son calefactados: con nieve marcan poco o nada
+   (y más tarde, al fundirse, lluvia que no toca), y el krigeado pinta «huevos fritos» en el Pirineo.
+   Una estación se deja fuera si en el periodo de la lluvia ha estado en la nieve —por encima de la
+   cota de nieve más baja de AROME en ese punto (con 100 m de margen) o a 1 °C o menos ahora— y además
+   ha recogido menos de la mitad que sus vecinas (≤ 30 km) que no estaban en la nieve, o, si no hay
+   al menos 2 de esas, que el 75 % de todas sus vecinas. Las que recogen como sus vecinas (calefactadas,
+   o lluvia de verdad) se quedan. */
+async function snowGauges(pts, v) {
+  const now = Date.now(), H = 3600e3;
+  const t0 = v === "p1" ? now - H : v === "p24" ? now - 24 * H
+    : new Date(new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Madrid" }) + "T00:00:00").getTime();
+  const cota = await Arome.cotaMin(pts, t0, now);
+  if (!cota) return [];
+  const snowy = pts.map((p, i) => (cota[i] != null && p.alt != null && p.alt >= cota[i] - 100) || (p.s.ta != null && p.s.ta <= 1));
+  if (!snowy.some(Boolean)) return [];
+  const KX = 111.32 * Math.cos(41.4 * Math.PI / 180), KY = 110.57;
+  const med = a => { const s = a.slice().sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+  const q75 = a => { const s = a.slice().sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(0.75 * s.length))]; };
+  const out = [];
+  pts.forEach((p, i) => {
+    if (!snowy[i]) return;
+    const warm = [], all = [];
+    pts.forEach((q, j) => {
+      if (i === j || Math.hypot((p.lon - q.lon) * KX, (p.lat - q.lat) * KY) > 30) return;
+      all.push(q.v);
+      if (!snowy[j]) warm.push(q.v);
+    });
+    const ref = warm.length >= 2 ? med(warm) : all.length >= 3 ? q75(all) : null;
+    if (ref != null && ref >= 1 && p.v < 0.5 * ref) out.push(p);
+  });
+  return out;
 }
 
 /* ---------------------------------------------------------- capas extra */

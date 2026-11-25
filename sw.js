@@ -4,7 +4,7 @@
    - Librerías de CDN con versión fija y tipografías: primero la copia guardada.
    - Datos (rama data, APIs, teselas): siempre de la red, no se guardan. */
 
-const CACHE = "aragonwx-v8";
+const CACHE = "aragonwx-v9";
 const SHELL = ["./", "index.html", "estado.html", "acerca.html", "manifest.webmanifest", "css/style.css", "js/scales.js", "js/kriging.js",
   "js/forecast.js", "js/app.js", "js/arome.js", "js/radar.js", "js/aemethist.js", "js/avisos.js", "js/summary.js", "js/editor.js",
   "assets/provincias.geojson", "assets/icons/icon-192.png"];

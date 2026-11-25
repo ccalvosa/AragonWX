@@ -37,6 +37,10 @@ const Radar = (() => {
   const WIN_KEY = "aragonwx-radar-win";
   let win = 3;
   try { win = [1, 3, 6, 12, 24].includes(+localStorage.getItem(WIN_KEY)) ? +localStorage.getItem(WIN_KEY) : 3; } catch {}
+  /* opacidad del radar (deja ver el mapa de fondo), recordada en este navegador */
+  const OP_KEY = "aragonwx-radar-op";
+  let opacity = 85;
+  try { const o = +localStorage.getItem(OP_KEY); if (o >= 20 && o <= 100) opacity = o; } catch {}
   const cache = new Map();   // nombre de PNG -> Promise<Uint8Array>
   const tip = document.createElement("div");
   tip.className = "arome-tip"; tip.hidden = true;
@@ -146,7 +150,7 @@ const Radar = (() => {
     onAdd(map) {
       this._map = map;
       this._cv = L.DomUtil.create("canvas", "arome-canvas leaflet-zoom-hide");
-      this._cv.style.opacity = 0.85;
+      this._cv.style.opacity = opacity / 100;
       map.getPane("radar").appendChild(this._cv);
       map.on("moveend zoomend resize viewreset", this._draw, this);
       map.on("zoomstart", this._hide, this);
@@ -379,6 +383,16 @@ const Radar = (() => {
     tip.hidden = true;
     $("#radar-mode").hidden = true;
   }
+  const op = $("#radar-op");
+  op.value = opacity;
+  $("#radar-op-v").textContent = opacity + " %";
+  op.addEventListener("input", () => {
+    opacity = +op.value;
+    $("#radar-op-v").textContent = opacity + " %";
+    if (layer?._cv) layer._cv.style.opacity = opacity / 100;
+    try { localStorage.setItem(OP_KEY, String(opacity)); } catch {}
+  });
+
   function setWin(h) {
     win = h;
     try { localStorage.setItem(WIN_KEY, String(h)); } catch {}

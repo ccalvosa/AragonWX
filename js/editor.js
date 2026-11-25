@@ -19,10 +19,16 @@ const Editor = (() => {
                   MC: id => `https://www.meteoclimatic.net/perfil/${id}`, HOLFUY: id => `https://holfuy.com/es/weather/${id}`,
                   AVAMET: id => `https://www.avamet.org/mxo_i.php?id=${id}` };
   const QOPT = [["", "Sin valorar"], ["Contrastada", "Contrastada"], ["Deficiente", "Deficiente"]];
-  const PEND_KEY = "aragonwx-pending";
+  const PEND_KEY = "aragonwx-pending", DONE_KEY = "aragonwx-done";
+  const QNAME = { q_tmax: "máxima", q_tmin: "mínima", q_prec: "lluvia", q_wind: "viento" };
 
   let pw = null, csv = null, pending = [], tab = "changes", picking = null, sugg = null, suggLayer = null, pin = null;
+  let done = {};   // "id:campo" -> hora en que se guardó (los avisos tardan ≤ 10 min en desaparecer)
   try { pw = sessionStorage.getItem("aragonwx-pw"); pending = JSON.parse(localStorage.getItem(PEND_KEY) || "[]"); } catch {}
+  try {
+    done = JSON.parse(localStorage.getItem(DONE_KEY) || "{}");
+    for (const [k, t] of Object.entries(done)) if (Date.now() - t > 40 * 60e3) delete done[k];
+  } catch {}
 
   /* ---------- CSV ---------- */
   function parseCSV(text) {
@@ -57,13 +63,39 @@ const Editor = (() => {
 
   /* ---------- cambios pendientes ---------- */
   function savePending() { try { localStorage.setItem(PEND_KEY, JSON.stringify(pending)); } catch {} updateBadge(); }
-  function addChange(ch) {
+  function addChange(ch, quiet = false) {
     // un único cambio por estación: los campos se acumulan
     const prev = pending.find(p => p.id === ch.id && p.type === ch.type);
     if (prev) Object.assign(prev.fields, ch.fields), prev.label = ch.label;
     else pending.push(ch);
     savePending();
-    toast(`Cambio anotado (${pending.length} pendiente${pending.length > 1 ? "s" : ""}). Guárdalos desde el editor.`);
+    if (!quiet) toast(`Anotado. Guárdalo con «Guardar», abajo del panel (${pending.length} pendiente${pending.length > 1 ? "s" : ""}).`);
+  }
+  const rowOf = id => csv?.rows.find(r => r.id === id);
+  const ignored = notes => (notes.match(/qc-ignore=([\w,]+)/)?.[1] || "").split(",").filter(Boolean);
+  /* quita un campo de un cambio pendiente (y el cambio entero si se queda vacío) */
+  function unsetField(id, k) {
+    const p = pending.find(x => x.id === id && x.type === "update");
+    if (!p) return;
+    delete p.fields[k];
+    if (!Object.keys(p.fields).length) pending.splice(pending.indexOf(p), 1);
+    savePending();
+  }
+  /* texto de un cambio (lista y mensaje del commit), sacado de los campos para que siga valiendo al deshacer */
+  function describe(p) {
+    if (p.type !== "update") return p.label;
+    const row = rowOf(p.id) || {}, name = BYID.get(p.id)?.name || row.name || p.id;
+    const parts = Object.entries(p.fields).map(([k, v]) => {
+      if (QNAME[k]) return `${QNAME[k]} ${v === "Deficiente" ? "deficiente" : v === "Contrastada" ? "contrastada" : "sin marca"}`;
+      if (k === "active") return v === "0" ? "baja" : "reactivación";
+      if (k === "tz_shift") return v === "1" ? "problema de hora" : "sin problema de hora";
+      if (k === "notes") {
+        const was = ignored(row.notes ?? BYID.get(p.id)?.notes ?? ""), add = ignored(v).filter(x => !was.includes(x));
+        return add.length ? `no avisar de ${add.map(x => VNAME[x] || x).join(", ")}` : "notas";
+      }
+      return { name: "nombre", lat: "latitud", lon: "longitud", alt: "altitud", model: "modelo" }[k] || k;
+    });
+    return `${name}: ${parts.join(", ")}`;
   }
   function applyChanges(rows) {
     const byId = new Map(rows.map(r => [r.id, r]));
@@ -87,21 +119,36 @@ const Editor = (() => {
     }
     return rows;
   }
+  let saving = false;
   async function saveAll() {
-    if (!pending.length) return;
-    const btn = $("#ed-save"); btn.disabled = true; btn.textContent = "Guardando…";
+    if (!pending.length || saving) return;
+    saving = true; updateBadge();
     try {
       await loadCSV();
       const rows = applyChanges(csv.rows.map(r => ({ ...r })));
-      const msg = pending.map(p => p.label).join("; ");
+      const msg = pending.map(describe).join("; ");
       await api("/stations", { method: "PUT", body: JSON.stringify({ content: toCSV(rows, csv.eol), sha: csv.sha, message: msg }) });
-      pending = []; savePending();
-      toast("Guardado. Los cambios entran en el mapa en la próxima actualización (≤ 10 min).", 6000);
-      render();
+      // se recuerda lo guardado para no volver a proponerlo mientras el bucle no lo recoge
+      const t = Date.now();
+      for (const p of pending) for (const [k, v] of Object.entries(p.fields)) {
+        if (k === "notes") for (const x of ignored(v)) done[`${p.id}:ign:${x}`] = t;
+        else done[`${p.id}:${k}`] = t;
+      }
+      try { localStorage.setItem(DONE_KEY, JSON.stringify(done)); } catch {}
+      const n = pending.length;
+      pending = []; saving = false; savePending();
+      await loadCSV().catch(() => {});
+      toast(`Guardado${n > 1 ? ` (${n} estaciones)` : ""}. Entra en el mapa en la próxima actualización (≤ 10 min).`, 6000);
+      refreshView();
     } catch (e) {
+      saving = false; updateBadge();
       toast("No se ha podido guardar: " + e.message, 6000);
-      btn.disabled = false; btn.textContent = "Guardar los cambios";
     }
+  }
+  /* vuelve a pintar lo que esté abierto (el editor o la ficha de una estación) */
+  function refreshView() {
+    if (S.side === "editor") render();
+    else if (S.side === "station" && S.sel) openStation(S.sel, false);
   }
 
   /* ---------- acceso ---------- */
@@ -119,13 +166,13 @@ const Editor = (() => {
     $("#ed-login").addEventListener("submit", async e => {
       e.preventDefault();
       pw = $("#ed-pw").value;
-      try { await loadCSV(); try { sessionStorage.setItem("aragonwx-pw", pw); } catch {} document.body.classList.add("editing"); render(); }
+      try { await loadCSV(); try { sessionStorage.setItem("aragonwx-pw", pw); } catch {} document.body.classList.add("editing"); updateBadge(); render(); }
       catch (err) { pw = null; showLogin(err.status === 401 ? "Contraseña incorrecta." : "No se puede conectar con el editor: " + err.message); }
     });
   }
   function logout() {
     pw = null; try { sessionStorage.removeItem("aragonwx-pw"); } catch {}
-    document.body.classList.remove("editing"); clearSugg(); closeSide();
+    document.body.classList.remove("editing"); clearSugg(); closeSide(); updateBadge();
   }
 
   /* ---------- panel del editor ---------- */
@@ -147,13 +194,11 @@ const Editor = (() => {
     $("#ed-body").innerHTML = `
       <p class="hint">Abre cualquier estación para cambiar su calidad, el problema de hora, sus notas o darla de baja.
         Para una estación nueva, usa <b>Alta</b> o haz clic en el mapa y «Añadir una estación aquí».</p>
-      ${pending.length ? `<ul class="ed-list">${pending.map((p, i) => `<li><span>${esc(p.label)}</span>
+      ${pending.length ? `<ul class="ed-list">${pending.map((p, i) => `<li><span>${esc(describe(p))}</span>
         <button class="link-btn small" data-i="${i}">quitar</button></li>`).join("")}</ul>
-        <div class="side-actions"><button class="btn" id="ed-save">Guardar los cambios</button>
-        <button class="btn ghost" id="ed-clear">Descartar todo</button></div>`
+        <div class="side-actions"><button class="btn ghost" id="ed-clear">Descartar todo</button></div>`
       : `<p class="st-status">No hay cambios pendientes.</p>`}`;
     $$("#ed-body .ed-list button").forEach(b => b.addEventListener("click", () => { pending.splice(+b.dataset.i, 1); savePending(); render(); }));
-    $("#ed-save")?.addEventListener("click", saveAll);
     $("#ed-clear")?.addEventListener("click", () => { if (confirm("¿Descartar todos los cambios pendientes?")) { pending = []; savePending(); render(); } });
   }
 
@@ -255,27 +300,67 @@ const Editor = (() => {
     const tok = "qc-ignore=" + [...set].join(",");
     return m ? notes.replace(m[0], tok) : (notes ? notes + " " : "") + tok;
   }
-  async function renderQC() {
-    $("#ed-body").innerHTML = `<p class="hint">Estaciones que se apartan de sus vecinas de forma repetida: en directo (al menos
-      1 h hoy o varios días esta semana) o siempre hacia el mismo lado en los últimos 14 días cerrados (<b>sesgo</b>). <b>Marcar deficiente</b> oculta esa variable en el mapa; <b>Descartar</b> deja de avisar
-      de esa variable en esta estación.</p><p class="st-status" id="eq-info">Cargando…</p><ul class="ed-sugg" id="eq-list"></ul>`;
-    let q;
-    try { q = await getJSON(DATA_URL + "qc.json" + bust()); }
-    catch { $("#eq-info").textContent = "Todavía no hay resultados del control de calidad."; return; }
-    const done = new Set(pending.map(p => p.id));
+  function withoutIgnore(notes, v) {
+    const m = notes.match(/qc-ignore=([\w,]+)/);
+    if (!m) return notes;
+    const rest = m[1].split(",").filter(x => x && x !== v);
+    return (rest.length ? notes.replace(m[0], "qc-ignore=" + rest.join(",")) : notes.replace(m[0], "")).replace(/\s+/g, " ").trim();
+  }
+  /* estado de un aviso: "bad"/"skip" anotado sin guardar, "saved" ya guardado, o null */
+  function flagState(id, f) {
+    const p = pending.find(x => x.id === id && x.type === "update")?.fields || {};
+    if (f.qcol && p[f.qcol] === "Deficiente") return "bad";
+    if (p.notes != null && ignored(p.notes).includes(f.var)) return "skip";
+    if ((f.qcol && done[`${id}:${f.qcol}`]) || done[`${id}:ign:${f.var}`]) return "saved";
+    return null;
+  }
+  function undoFlag(id, f, st) {
+    if (st === "bad") return unsetField(id, f.qcol);
+    const orig = rowOf(id)?.notes ?? (BYID.get(id)?.notes || ""), now = withoutIgnore(notesOf(id), f.var);
+    if (now === orig) unsetField(id, "notes");
+    else addChange({ type: "update", id, label: "", fields: { notes: now } }, true);
+  }
+  const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+  let qcData = null;
+  async function renderQC(reload = true) {
+    if (reload || !qcData) {
+      $("#ed-body").innerHTML = `<p class="hint">Estaciones que se apartan de sus vecinas de forma repetida: en directo (al menos
+        1 h hoy o varios días esta semana) o siempre hacia el mismo lado en los últimos 14 días cerrados (<b>sesgo</b>).
+        <b>Deficiente</b> oculta esa variable en el mapa; <b>Descartar</b> deja de avisar de esa variable en esta estación.
+        Ve marcando las que quieras y guárdalas todas juntas con «Guardar», abajo del panel.</p>
+        <p class="st-status" id="eq-info">Cargando…</p><ul class="ed-sugg" id="eq-list"></ul>`;
+      try { qcData = await getJSON(DATA_URL + "qc.json" + bust()); }
+      catch { $("#eq-info").textContent = "Todavía no hay resultados del control de calidad."; return; }
+      if (tab !== "qc" || S.side !== "editor") return;
+    }
+    const q = qcData;
     // los de sesgo (14 días) van primero: son los más sólidos
     const score = e => Math.max(...e.flags.map(f => (f.daily ? 1e4 + f.n : f.days * 100 + f.today)));
-    const items = Object.entries(q.stations).filter(([id]) => !done.has(id)).sort((a, b) => score(b[1]) - score(a[1]));
-    $("#eq-info").textContent = items.length
+    const all = Object.entries(q.stations).sort((a, b) => score(b[1]) - score(a[1]));
+    // las que ya se guardaron del todo no se vuelven a proponer (el bucle tarda ≤ 10 min en recogerlo)
+    const items = all.filter(([id, e]) => !e.flags.every(f => flagState(id, f) === "saved"));
+    const nSaved = all.length - items.length;
+    $("#eq-info").textContent = (items.length
       ? `${items.length} estaciones sospechosas · ${new Date(q.generated).toLocaleString("es-ES", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}`
-      : "Ninguna estación sospechosa ahora mismo.";
-    $("#eq-list").innerHTML = items.map(([id, e]) => `<li data-id="${esc(id)}" class="eq-item"><div style="flex:1">
+      : "Ninguna estación sospechosa ahora mismo.") + (nSaved ? ` · ${nSaved} ya resueltas` : "");
+    const STXT = { bad: "Deficiente · sin guardar", skip: "Descartado · sin guardar", saved: "Guardado" };
+    $("#eq-list").innerHTML = items.map(([id, e]) => {
+      const open = e.flags.filter(f => f.qcol && !flagState(id, f));
+      return `<li data-id="${esc(id)}" class="eq-item"><div style="flex:1">
         <span class="r-name">${esc(e.name)}</span><span class="r-meta">${NETS[e.src] || e.src} · ${esc(id)}</span>
-        ${e.flags.map((f, i) => `<div class="eq-flag"><span class="small">⚠ ${esc(f.msg)}</span>
+        ${e.flags.map((f, i) => {
+          const st = flagState(id, f);
+          return `<div class="eq-flag${st ? " eq-done" : ""}"><span class="small">⚠ ${esc(f.msg)}</span>
           <span class="r-meta">${f.daily ? `<span class="eq-tag">Sesgo</span> ${esc(f.meta)}` : `${f.today} pasadas hoy · ${f.days} ${f.days === 1 ? "día" : "días"} esta semana`}</span>
-          <div class="ed-btns">${f.qcol ? `<button class="btn sm" data-a="bad" data-i="${i}">Marcar ${VNAME[f.var]} deficiente</button>` : ""}
-          <button class="btn ghost sm" data-a="skip" data-i="${i}">Descartar</button></div></div>`).join("")}
-      </div><button class="btn ghost sm" data-a="see">Ver</button></li>`).join("");
+          <div class="ed-btns">${st
+            ? `<span class="badge ${st === "saved" ? "ok" : "warn"}">✓ ${STXT[st]}</span>${st !== "saved" ? `<button class="link-btn small" data-a="undo" data-i="${i}">deshacer</button>` : ""}`
+            : `${f.qcol ? `<button class="btn sm" data-a="bad" data-i="${i}">${cap(VNAME[f.var])} deficiente</button>` : ""}
+               <button class="btn ghost sm" data-a="skip" data-i="${i}">Descartar</button>`}</div></div>`;
+        }).join("")}
+        ${open.length > 1 ? `<div class="ed-btns eq-all"><button class="btn ghost sm" data-a="allbad">Todo deficiente (${open.map(f => VNAME[f.var]).join(", ")})</button></div>` : ""}
+      </div><button class="btn ghost sm" data-a="see">Ver</button></li>`;
+    }).join("");
+    const keep = () => { const y = $("#side-body").scrollTop; renderQC(false); $("#side-body").scrollTop = y; };
     $$("#eq-list li").forEach(li => {
       const id = li.dataset.id, e = q.stations[id];
       li.querySelector("[data-a=see]").addEventListener("click", () => {
@@ -284,13 +369,24 @@ const Editor = (() => {
       });
       li.querySelectorAll("[data-a=bad]").forEach(b => b.addEventListener("click", () => {
         const f = e.flags[+b.dataset.i];
-        addChange({ type: "update", id, label: `${e.name}: ${VNAME[f.var]} deficiente (control de calidad)`, fields: { [f.qcol]: "Deficiente" } });
-        renderQC();
+        addChange({ type: "update", id, label: "", fields: { [f.qcol]: "Deficiente" } }, true);
+        keep();
       }));
+      li.querySelector("[data-a=allbad]")?.addEventListener("click", () => {
+        const fields = {};
+        for (const f of e.flags) if (f.qcol && !flagState(id, f)) fields[f.qcol] = "Deficiente";
+        addChange({ type: "update", id, label: "", fields }, true);
+        keep();
+      });
       li.querySelectorAll("[data-a=skip]").forEach(b => b.addEventListener("click", () => {
         const f = e.flags[+b.dataset.i];
-        addChange({ type: "update", id, label: `${e.name}: descartar aviso de ${VNAME[f.var]}`, fields: { notes: withIgnore(notesOf(id), f.var) } });
-        renderQC();
+        addChange({ type: "update", id, label: "", fields: { notes: withIgnore(notesOf(id), f.var) } }, true);
+        keep();
+      }));
+      li.querySelectorAll("[data-a=undo]").forEach(b => b.addEventListener("click", () => {
+        const f = e.flags[+b.dataset.i];
+        undoFlag(id, f, flagState(id, f));
+        keep();
       }));
     });
   }
@@ -313,9 +409,9 @@ const Editor = (() => {
     let q;
     try { q = await getJSON(DATA_URL + "rehab.json" + bust()); }
     catch { $("#er-info").textContent = "Todavía no hay revisión de las deficientes (la hace el bucle una vez al día)."; return; }
-    const done = new Set(pending.filter(p => p.type === "update").flatMap(p => Object.keys(p.fields).map(k => p.id + ":" + k)));
+    const pend = (id, k) => pending.find(p => p.id === id && p.type === "update")?.fields[k] === "";
     const all = Object.entries(q.stations).flatMap(([id, st]) => st.vars.map(e => ({ id, st, e })))
-      .filter(({ id, e }) => !done.has(id + ":" + e.qcol));
+      .filter(({ id, e }) => !done[`${id}:${e.qcol}`]);
     const inF = (f, v) => f === "all" || (f === "rest" ? REST.includes(v) : v === f);
     $$("#er-f button").forEach(b => {
       b.textContent += ` (${all.filter(({ e }) => inF(b.dataset.f, e.verdict)).length})`;
@@ -344,7 +440,9 @@ const Editor = (() => {
         <span class="r-name">${esc(st.name)}</span><span class="r-meta">${NETS[st.src] || st.src} · ${esc(id)} · ${RVAR[e.var][0]} deficiente</span>
         <div class="eq-flag er-${cls || "none"}"><span class="small"><span class="badge ${cls}">${txt}</span>${e.frozen ? " · serie congelada" : ""}</span>
           ${e.n ? `<span class="r-meta">${stats(e)}</span><span class="er-dots">${dots(e)}</span>` : ""}
-          <div class="ed-btns"><button class="btn sm${e.verdict === "ok" ? "" : " ghost"}" data-a="clear">Quitar «Deficiente» de la ${RVAR[e.var][0]}</button></div></div>
+          <div class="ed-btns">${pend(id, e.qcol)
+            ? `<span class="badge warn">✓ Sin «Deficiente» · sin guardar</span><button class="link-btn small" data-a="undo">deshacer</button>`
+            : `<button class="btn sm${e.verdict === "ok" ? "" : " ghost"}" data-a="clear">Quitar «Deficiente» de la ${RVAR[e.var][0]}</button>`}</div></div>
       </div><button class="btn ghost sm" data-a="see">Ver</button></li>`;
     }).join("");
     $$("#er-list li").forEach(li => {
@@ -353,10 +451,12 @@ const Editor = (() => {
         const s = BYID.get(id);
         if (s) { map.flyTo([s.lat, s.lon], 12); openStation(id, false); }
       });
-      li.querySelector("[data-a=clear]").addEventListener("click", () => {
-        addChange({ type: "update", id, label: `${st.name}: ${RVAR[e.var][0]} ya no deficiente (${e.good}/${e.n} días bien)`, fields: { [e.qcol]: "" } });
-        renderRehab();
+      const keep = () => { const y = $("#side-body").scrollTop; renderRehab().then(() => { $("#side-body").scrollTop = y; }); };
+      li.querySelector("[data-a=clear]")?.addEventListener("click", () => {
+        addChange({ type: "update", id, label: "", fields: { [e.qcol]: "" } }, true);
+        keep();
       });
+      li.querySelector("[data-a=undo]")?.addEventListener("click", () => { unsetField(id, e.qcol); keep(); });
     });
   }
 
@@ -426,11 +526,11 @@ const Editor = (() => {
         if (v !== (row[k] ?? "") || !row.id) fields[k] = v;
       });
       if (!Object.keys(fields).length) return toast("No has cambiado nada.");
-      addChange({ type: "update", id: st.id, label: `cambio en ${st.name} (${Object.keys(fields).join(", ")})`, fields });
+      addChange({ type: "update", id: st.id, label: "", fields });
       openStation(st.id, false);
     });
     $("#es-active").addEventListener("click", () => {
-      addChange({ type: "update", id: st.id, label: `${active ? "baja" : "reactivación"} de ${st.name}`, fields: { active: active ? "0" : "1" } });
+      addChange({ type: "update", id: st.id, label: "", fields: { active: active ? "0" : "1" } });
       openStation(st.id, false);
     });
   }
@@ -443,9 +543,26 @@ const Editor = (() => {
     $("#ed-here")?.addEventListener("click", () => { render(); tab = "add"; renderAdd({ lat: lat.toFixed(5), lon: lon.toFixed(5) }); });
   }
 
+  /* barra fija al pie del panel lateral (editor y fichas): guardar sin cambiar de pestaña */
   function updateBadge() {
     const b = $("#btn-editor");
     if (b) b.textContent = pending.length ? `Editar la red (${pending.length})` : "Editar la red";
+    let bar = $("#ed-savebar");
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.id = "ed-savebar"; bar.className = "ed-savebar";
+      $("#side").appendChild(bar);
+      bar.addEventListener("click", e => {
+        const a = e.target.closest("[data-a]")?.dataset.a;
+        if (a === "save") saveAll();
+        if (a === "list") { tab = "changes"; render(); }
+      });
+    }
+    bar.hidden = !pw || !pending.length;
+    const n = pending.length;
+    bar.innerHTML = `<span>${n} ${n === 1 ? "cambio" : "cambios"} sin guardar</span>
+      <button class="link-btn small" data-a="list">ver</button>
+      <button class="btn sm" data-a="save" ${saving ? "disabled" : ""}>${saving ? "Guardando…" : "Guardar"}</button>`;
   }
 
   // si ya había sesión, se recarga el CSV en segundo plano

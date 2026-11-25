@@ -59,7 +59,7 @@ descarga los datos cada 10 minutos y los publica en la rama `data`.
   reflectividad de alta resolución (exploración Doppler, 500 m hasta 150 km), de
   baja resolución (largo alcance, 1 km hasta 250 km) y velocidad radial, de la
   elevación más baja; cada producto, una imagen cada 10 min; se guardan 24 h y en la web
-  se elige animar las últimas 1, 3, 6, 12 o 24 h. `scraper/aragonwx/radar.py` y el flujo `update-radar`
+  se elige animar las últimas 1, 3, 6, 12 o 24 h, con opacidad ajustable. `scraper/aragonwx/radar.py` y el flujo `update-radar`
   (bucle de 1 min) la publican en la rama `radar`; la web pinta cada píxel con su
   celda del radar, sin estirar ni suavizar.
   **Lluvia estimada** de 1, 3, 6, 12 y 24 h con la exploración de largo alcance (24 h guardadas
@@ -75,6 +75,10 @@ descarga los datos cada 10 minutos y los publica en la rama `data`.
   los residuos y en cada píxel se suma la tendencia con la altitud del terreno. El
   modelo del terreno (`assets/dem.png`, ~250 m) sale de AWS Terrain Tiles (EU-DEM de
   Copernicus y SRTM) con `scripts/make_dem.py`, una sola vez.
+  En lluvia (en directo) se quitan los pluviómetros que han estado en la nieve y no la
+  han medido (`snowGauges` en `js/app.js`): por encima de la cota de nieve más baja de AROME
+  en el periodo (−100 m) o a ≤ 1 °C, y con menos de la mitad que sus vecinas a ≤ 30 km que
+  no estaban en la nieve. Los de aficionado no son calefactados y dejaban «huevos fritos».
 - Filtros por umbral, por red y por calidad; ranking; búsqueda (`/`); tema claro/oscuro;
   enlaces directos a una estación (`#ta/9434`).
 
@@ -272,9 +276,13 @@ Se guarda en el estado (`qc_bias`) y cada pasada lo añade a `qc.json` (con `dai
 sin las variables ya deficientes o descartadas. En el editor salen con la etiqueta «Sesgo».
 
 En el editor:
-- **Marcar deficiente** pone la calidad de esa variable a *Deficiente*.
+- **Deficiente** pone la calidad de esa variable a *Deficiente* (**Todo deficiente** si la
+  estación tiene varias).
 - **Descartar** añade `qc-ignore=<variable>` a las notas de la estación, para no volver a
   avisar de esa variable.
+Cada aviso marcado se queda en la lista con su estado y «deshacer»; una barra al pie del
+panel (también en las fichas) guarda todo junto en un único commit. Lo guardado se recuerda
+40 min en el navegador para no volver a proponerlo mientras el bucle lo recoge.
 
 **Revisión de las deficientes** (`scraper/aragonwx/rehab.py`, `rehab.json`, una vez al día;
 pestaña **Deficientes** del editor). Cada variable marcada *Deficiente* se compara día a día,
