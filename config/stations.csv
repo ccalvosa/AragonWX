@@ -1541,7 +1541,7 @@ IPOMER14,WU,Pomer,Zaragoza,41.63830,-1.84160,1114,https://www.wunderground.com/d
 IPUEND2,WU,Puendeluna,Zaragoza,42.15330,-0.75600,401,https://www.wunderground.com/dashboard/pws/IPUEND2,,Tambien WC,,,,,,,1
 IZARAG67,WU,San Gregorio,Zaragoza,41.69210,-0.86330,231,https://www.wunderground.com/dashboard/pws/IZARAG67,AmbientWeatherWS-1000,Datos erroneos de precipitacion infraestimados. Temperaturas no congruentes.,,,,,,,1
 IZARAG153,WU,San Gregorio Merca Zaragoza,Zaragoza,41.68540,-0.85730,207,https://www.wunderground.com/dashboard/pws/IZARAG153,,,,,,,,,1
-IZARAG81,WU,San Jose Bcola Muerte,Zaragoza,41.62460,-0.86500,210,https://www.wunderground.com/dashboard/pws/IZARAG81,AmbientWeatherWS-1000,Maxima sospechosa por radiacion solar. Precipitacion infraestimada. WeatherCloud.,,,,,,,1
+IZARAG81,WU,San Jose Bcola Muerte,Zaragoza,41.62460,-0.86500,210,https://www.wunderground.com/dashboard/pws/IZARAG81,AmbientWeatherWS-1000,Maxima sospechosa por radiacion solar. Precipitacion infraestimada. WeatherCloud.,Deficiente,,,,,,1
 IZARAG140,WU,San Jose Escultor Ramirez,Zaragoza,41.63310,-0.87560,226,https://www.wunderground.com/dashboard/pws/IZARAG140,,Datos de precipitacion sobreestimados.,,,,Deficiente,,,1
 IZARAG70,WU,San Jose San Fernando,Zaragoza,41.63500,-0.88300,240,https://www.wunderground.com/dashboard/pws/IZARAG70,,,Deficiente,,,,,,1
 IZARAG32,WU,San Juan C San Juan,Zaragoza,41.71560,-0.83640,221,https://www.wunderground.com/dashboard/pws/IZARAG32,,,,,,,,,1
