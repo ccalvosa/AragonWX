@@ -965,7 +965,7 @@ LETL,WC,Teruel Aeropuerto,Teruel,40.41167,-1.21750,1014,https://app.weathercloud
 1448113304,WC,Teruel Maquinaria Dga,Teruel,40.35000,-1.10806,937,https://app.weathercloud.net/d1448113304#current,,,,,,,,,1
 674916464,WC,Tornos,Teruel,40.96330,-1.43250,1018,https://app.weathercloud.net/d0674916464#current,,,,,,,,,1
 3919283004,WC,Torres de Albarracin,Teruel,40.42694,-1.53306,1238,https://app.weathercloud.net/d3919283004#current,,,,,,,,,1
-1321757349,WC,Tortajada,Teruel,40.39000,-1.07472,999,https://app.weathercloud.net/d1321757349#current,,,,,,,,,1
+1321757349,WC,Tortajada,Teruel,40.39000,-1.07472,999,https://app.weathercloud.net/d1321757349#current,,qc-ignore=tn,,,,,,,1
 8370742841,WC,Tronchon,Teruel,40.62861,-0.40611,1177,https://app.weathercloud.net/d8370742841#current,,,,,,,,,1
 6873231732,WC,Utrillas,Teruel,40.80833,-0.84278,963,https://app.weathercloud.net/d6873231732#current,,,,,,,,,1
 9722220744,WC,Valderrobres Ne,Teruel,40.88361,0.16944,558,https://app.weathercloud.net/d9722220744#current,,,,,,,,,1
