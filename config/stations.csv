@@ -600,7 +600,7 @@ Mosqueruela_ErmitaSanAntonio,AVAMET,Mosqueruela ErmitaSanAntonio,Teruel,40.36123
 117750,ECOWITT,Zuera,,41.86965,-0.79257,285,https://www.ecowitt.net/home/index?id=117750,,,Deficiente,,,,,,0
 IB_Azanuy,HOLFUY,Azanuy,Huesca,41.95140,0.27368,,https://holfuy.com/es/weather/1758,Holfuy,,Deficiente,Deficiente,,,,,1
 IB_MONT,HOLFUY,Monteagudo del Castillo-El Portero,Teruel,40.41480,-0.75586,1484,https://holfuy.com/es/weather/1104,Holfuy+Davis VP2,ALTITUD: 1490 ZONA HABITADA: NO,,,,,,,1
-IB_Fuentes,HOLFUY,FuentesdeEbro,Zaragoza,41.50495,-0.65517,,https://holfuy.com/es/weather/1935,Holfuy,,Deficiente,,Deficiente,,,,1
+IB_Fuentes,HOLFUY,FuentesdeEbro,Zaragoza,41.50495,-0.65517,,https://holfuy.com/es/weather/1935,Holfuy,,Deficiente,Deficiente,Deficiente,Deficiente,,,1
 IB_ABAB,IBERICAM,Ababuj - Cerrada del Lugar,Teruel,40.52585,-0.81400,1323,https://ibericam.com/el-tiempo/widget.php?station=ababuj-cerrada-del-lugar,Arduino,ALTITUD: 1329 ZONA HABITADA: NO,,,,,,,1
 IB_ALBEN,IBERICAM,Albentosa,Teruel,40.10239,-0.77051,974,https://ibericam.com/el-tiempo/widget.php?station=albentosa,Davis Vantage VUE,ALTITUD: 953 ZONA HABITADA: SI,,,,,,,1
 IB_ALCALA,IBERICAM,Alcalá de la Selva-V. de la Vega,Teruel,40.36011,-0.69718,1400,https://ibericam.com/el-tiempo/widget.php?station=alcala-de-la-selva,Davis VP2,ALTITUD: 1400 ZONA HABITADA: SI,,,,,,,1
