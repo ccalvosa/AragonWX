@@ -1009,7 +1009,7 @@ LEBR,WC,Las Bardenas Reales,Zaragoza,42.11970,-1.26000,314,https://app.weathercl
 5844277490,WC,Ricla,Zaragoza,41.56670,-1.38420,423,https://app.weathercloud.net/d5844277490#current,,,,,,Deficiente,,,1
 813254336,WC,San Jose Maria Moliner,Zaragoza,41.63940,-0.88420,228,https://app.weathercloud.net/d0813254336#current,CCLElectronicsW100,,,,,,,,1
 2565461859,WC,San Martín de la Virgen del Moncayo,Zaragoza,41.83560,-1.79310,829,https://app.weathercloud.net/d2565461859#current,,,,,,,,,1
-1395270742,WC,Santa Isabel-Autovia,Zaragoza,41.66780,-0.81470,212,https://app.weathercloud.net/d1395270742#current,Bresser5-in-1,,,,,,,,1
+1395270742,WC,Santa Isabel-Autovia,Zaragoza,41.66780,-0.81470,212,https://app.weathercloud.net/d1395270742#current,Bresser5-in-1,,Deficiente,,,,,,1
 6063469335,WC,Sestricac,Zaragoza,41.48750,-1.59420,540,https://app.weathercloud.net/d6063469335#current,,,,,,,,,1
 1129713306,WC,Sisamon,Zaragoza,41.17130,-2.00390,1050,https://app.weathercloud.net/d1129713306#current,,,,,,,,,1
 9375153895,WC,Tarazona Eguaras,Zaragoza,41.90030,-1.72670,484,https://app.weathercloud.net/d9375153895#current,,,,,,,,,1
@@ -1082,7 +1082,7 @@ ISANES37,WU,Binefar Ene,Huesca,41.85571,0.33422,295,https://www.wunderground.com
 ISANES10,WU,Binefar Este,Huesca,41.85916,0.31634,298,https://www.wunderground.com/dashboard/pws/ISANES10,,,,,,,,,1
 ISANES35,WU,Binefar Se,Huesca,41.84260,0.32093,276,https://www.wunderground.com/dashboard/pws/ISANES35,,También en EW,,,,,,,1
 IBISAU1,WU,Bisaurri,Huesca,42.48995,0.52100,1273,https://www.wunderground.com/dashboard/pws/IBISAU1,,,,,,,,,1
-ILASOT1,WU,Bolea,Huesca,42.25993,-0.55305,659,https://www.wunderground.com/dashboard/pws/ILASOT1,,,,,,,,,1
+ILASOT1,WU,Bolea,Huesca,42.25993,-0.55305,659,https://www.wunderground.com/dashboard/pws/ILASOT1,,,Deficiente,,,,,,1
 IBOLTA6,WU,Boltaña SE,Huesca,42.43200,0.09300,640,https://www.wunderground.com/dashboard/pws/IBOLTA6,,,,,,,,,1
 IBONAN4,WU,Bonansa,Huesca,42.42637,0.66768,1243,https://www.wunderground.com/dashboard/pws/IBONAN4,,,,,,,,,1
 IBROTO6,WU,Broto,Huesca,42.60266,-0.12139,894,https://www.wunderground.com/dashboard/pws/IBROTO6,,,,,,,,,1
@@ -1337,7 +1337,7 @@ IPEARR1,WU,Peñarroya de Tastavins,Teruel,40.75576,0.03995,746,https://www.wunde
 IPUERT172,WU,Puertomingalvo,Teruel,40.26420,-0.45897,1449,https://www.wunderground.com/dashboard/pws/IPUERT172,,,,,,,,,1
 IRFALE2,WU,Rafales,Teruel,40.83763,0.02148,620,https://www.wunderground.com/dashboard/pws/IRFALE2,,Tambien en WC,,,,,,,1
 IRILLO1,WU,Rillo,Teruel,40.72334,-0.99589,1272,https://www.wunderground.com/dashboard/pws/IRILLO1,,,,,,,,,1
-IRUBIE5,WU,Rubielos de Mora,Teruel,40.20757,-0.64502,1018,https://www.wunderground.com/dashboard/pws/IRUBIE5,,,,,,,,,1
+IRUBIE5,WU,Rubielos de Mora,Teruel,40.20757,-0.64502,1018,https://www.wunderground.com/dashboard/pws/IRUBIE5,,,Deficiente,,,,,,1
 IRUBIE3,WU,Rubielos de Mora NE,Teruel,40.19545,-0.67128,925,https://www.wunderground.com/dashboard/pws/IRUBIE3,,,,,,,,,1
 IARAGNSA3,WU,Samper de Calanda,Teruel,41.18998,-0.39195,235,https://www.wunderground.com/dashboard/pws/IARAGNSA3,,,Deficiente,,,,,,1
 ISARRI9,WU,Sarrion,Teruel,40.15787,-0.77845,891,https://www.wunderground.com/dashboard/pws/ISARRI9,,,,,,,,,1
